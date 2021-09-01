@@ -2,7 +2,7 @@
 // For config options, see the README at:
 // https://github.com/microsoft/vscode-dev-containers/tree/v0.187.0/containers/python-3
 {
-	"name": "Meltano",
+	"name": "TAP MSSQL",
 	"build": {
 		"dockerfile": "Dockerfile",
 		// Optionally add build args to be passed to the dockerfile:
@@ -11,7 +11,9 @@
 
 	// Add the IDs of extensions you want installed when the container is created.
 	"extensions": [
-		"innoverio.vscode-dbt-power-user"
+		"ms-python.python",
+		"ms-python.vscode-pylance",
+		"visualstudioexptteam.vscodeintellicode"
 	],
 
 	// Use 'forwardPorts' to make a list of ports inside the container available locally.
@@ -32,6 +34,10 @@
 
 	// Set *default* container specific settings.json values on container create.
 	"settings": {
+		"python.autoComplete.extraPaths": [
+			"${workspaceFolder}/customModule"
+		  ], 
+		"python.pythonPath": "${workspaceFolder}/.venv/bin/python3",
 		"python.linting.ignorePatterns": [
 			".vscode/*.py",
 			"**/site-packages/**/*.py",
