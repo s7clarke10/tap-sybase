@@ -25,6 +25,7 @@ from singer.catalog import Catalog, CatalogEntry
 import tap_mssql.sync_strategies.common as common
 import tap_mssql.sync_strategies.full_table as full_table
 import tap_mssql.sync_strategies.incremental as incremental
+import tap_mssql.sync_strategies.log_based as log_based
 
 from tap_mssql.connection import connect_with_backoff, MSSQLConnection
 
@@ -487,6 +488,17 @@ def do_sync_full_table(mssql_conn, config, catalog_entry, state, columns):
 
     singer.write_message(singer.StateMessage(value=copy.deepcopy(state)))
 
+def do_sync_log_based(mssql_conn, config, catalog_entry, state, columns):
+    mssql_conn = MSSQLConnection(config)
+    md_map = metadata.to_map(catalog_entry.metadata)
+    stream_version = common.get_stream_version(catalog_entry.tap_stream_id, state)
+    replication_key = md_map.get((), {}).get("replication-key")
+    write_schema_message(catalog_entry=catalog_entry, bookmark_properties=[replication_key])
+    LOGGER.info("Schema written")
+    stream_version = common.get_stream_version(catalog_entry.tap_stream_id, state)
+    log_based.sync_table(mssql_conn, config, catalog_entry, state, columns, stream_version)
+
+    singer.write_message(singer.StateMessage(value=copy.deepcopy(state)))
 
 def sync_non_binlog_streams(mssql_conn, non_binlog_catalog, config, state):
     mssql_conn = MSSQLConnection(config)
@@ -520,6 +532,7 @@ def sync_non_binlog_streams(mssql_conn, non_binlog_catalog, config, state):
             replication_method = "FULL_TABLE"
         LOGGER.info(f"Table {catalog_entry.table} will use {replication_method} sync")
 
+
         database_name = common.get_database_name(catalog_entry)
 
         with metrics.job_timer("sync_table") as timer:
@@ -532,8 +545,11 @@ def sync_non_binlog_streams(mssql_conn, non_binlog_catalog, config, state):
             elif replication_method == "FULL_TABLE":
                 LOGGER.info(f"syncing {catalog_entry.table} full table")
                 do_sync_full_table(mssql_conn, config, catalog_entry, state, columns)
+            elif replication_method == "LOG_BASED":
+                LOGGER.info(f"syncing {catalog_entry.table} cdc tables")
+                do_sync_log_based(mssql_conn, config, catalog_entry, state, columns)                
             else:
-                raise Exception("only INCREMENTAL and FULL TABLE replication methods are supported")
+                raise Exception("only INCREMENTAL, LOG_BASED and FULL TABLE replication methods are supported")
 
     state = singer.set_currently_syncing(state, None)
     singer.write_message(singer.StateMessage(value=copy.deepcopy(state)))
