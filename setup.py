@@ -7,7 +7,7 @@ setup(
     version="1.0.3",
     description="Singer.io tap for extracting data from SQL Server - PipelineWise compatible",
     author="Stitch",
-    url="https://github.com/wintersrd/pipelinewise-tap-mssql",
+    url="https://github.com/s7clarke10/pipelinewise-tap-mssql",
     classifiers=[
         "License :: OSI Approved :: GNU Affero General Public License v3",
         "Programming Language :: Python :: 3 :: Only",
