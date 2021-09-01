@@ -127,22 +127,22 @@ def sync_table(mssql_conn, config, catalog_entry, state, columns, stream_version
     version_exists = True if "version" in bookmark else False
 
     ### BEGIN NEW LOGIC FOR CDC
-    result = get_change_data_capture_tables(mssql_conn)    
-    LOGGER.info("Here is the tracking tables results %s", result)
+    # result = get_change_data_capture_tables(mssql_conn)    
+    # LOGGER.info("Here is the tracking tables results %s", result)
 
-    result2 = get_change_data_capture_databases(mssql_conn)
-    LOGGER.info("Here is the tracking databases results %s", result2)
+    # result2 = get_change_data_capture_databases(mssql_conn)
+    # LOGGER.info("Here is the tracking databases results %s", result2)
 
     # AdventureWorks2016.HumanResources.Department
-    result3 = get_object_id_by_table(mssql_conn, "AdventureWorks2016", "HumanResources", "Department")
-    LOGGER.info("Here is the table object id result %s", result3)
+    # result3 = get_object_id_by_table(mssql_conn, "AdventureWorks2016", "HumanResources", "Department")
+    # LOGGER.info("Here is the table object id result %s", result3)
     
 
-    from_lsn = get_from_lsn(mssql_conn, "HumanResources_Department")
-    LOGGER.info("Here is the table min lsn id result %s", from_lsn)
+    # from_lsn = get_from_lsn(mssql_conn, "HumanResources_Department")
+    # LOGGER.info("Here is the table min lsn id result %s", from_lsn)
 
-    to_lsn = get_to_lsn(mssql_conn)
-    LOGGER.info("Here is the table max lsn id result %s", to_lsn)
+    # to_lsn = get_to_lsn(mssql_conn)
+    # LOGGER.info("Here is the table max lsn id result %s", to_lsn)
 
     ### END LOGIC FOR CDC
 
@@ -165,10 +165,10 @@ def sync_table(mssql_conn, config, catalog_entry, state, columns, stream_version
         with open_conn.cursor() as cur:
             # select_sql = common.generate_select_sql(catalog_entry, columns)
             # start_scn = min([get_bookmark(state, s.tap_stream_id, 'scn') for s in streams])
-            print('Stream ID : ',catalog_entry.tap_stream_id)
+            # print('Stream ID : ',catalog_entry.tap_stream_id)
             escaped_columns = [common.escape(c) for c in columns]
             escaped_table   = (catalog_entry.tap_stream_id).replace("-","_")
-            print('Escaped Table : ',escaped_table)
+            # print('Escaped Table : ',escaped_table)
             select_sql = """DECLARE @from_lsn binary (10), @to_lsn binary (10)
             
                             SET @from_lsn = sys.fn_cdc_get_min_lsn('{}')
@@ -178,10 +178,9 @@ def sync_table(mssql_conn, config, catalog_entry, state, columns, stream_version
                             FROM cdc.fn_cdc_get_all_changes_{}(@from_lsn, @to_lsn, 'all')
                             ORDER BY __$seqval
                             ;""".format(escaped_table,",".join(escaped_columns),escaped_table)
-                            # SELECT "GroupName","ModifiedDate","DepartmentID","Name"
-            print("Catalog Entry : ",catalog_entry)
-            print("Columns : ",columns)
-            print("Select SQL : ",select_sql)
+            # print("Catalog Entry : ",catalog_entry)
+            # print("Columns : ",columns)
+            # print("Select SQL : ",select_sql)
             params = {}
 
             common.sync_query(
