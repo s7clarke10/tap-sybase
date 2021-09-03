@@ -493,10 +493,14 @@ def do_sync_log_based(mssql_conn, config, catalog_entry, state, columns):
     md_map = metadata.to_map(catalog_entry.metadata)
     stream_version = common.get_stream_version(catalog_entry.tap_stream_id, state)
     replication_key = md_map.get((), {}).get("replication-key")
+    # Add additional keys to the schema
+    log_based.add_synthetic_keys_to_schema(catalog_entry)
+    # Add additional keys to the columns
+    extended_columns = columns + ['_cdc_operation_type', '_cdc_lsn_commit_timestamp', '_cdc_lsn_deleted_at', '_cdc_lsn_hex_value']
     write_schema_message(catalog_entry=catalog_entry, bookmark_properties=[replication_key])
     LOGGER.info("Schema written")
     stream_version = common.get_stream_version(catalog_entry.tap_stream_id, state)
-    log_based.sync_table(mssql_conn, config, catalog_entry, state, columns, stream_version)
+    log_based.sync_table(mssql_conn, config, catalog_entry, state, columns, extended_columns, stream_version)
 
     singer.write_message(singer.StateMessage(value=copy.deepcopy(state)))
 
@@ -600,3 +604,6 @@ def main():
     except Exception as exc:
         LOGGER.critical(exc)
         raise exc
+
+if __name__ == '__main__':
+    main()  # pylint: disable=no-value-for-parameter
