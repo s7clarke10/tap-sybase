@@ -70,7 +70,6 @@ def get_lsn_extract_range(connection, schema_name, table_name,last_extract_datet
                AND __$Start_lsn >= sys.fn_cdc_map_time_to_lsn('smallest greater than or equal', @load_timestamp )
                ;
             """.format(str(last_extract_datetime),schema_name,table_name)
-    print(query)
     cur.execute(query)
     row = cur.fetchone()
 
