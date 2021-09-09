@@ -67,7 +67,7 @@ Create a config file containing the database connection credentials, e.g.:
   "port": "3306",
   "user": "root",
   "password": "password",
-  "database": "databasename"     (This is optional)
+  "database": "databasename"     (This_parameter_is_optional)
 }
 ```
 

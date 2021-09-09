@@ -26,9 +26,6 @@ def verify_change_data_capture_table(connection, schema_name, table_name):
                )
     row = cur.fetchone()
         
-    # LOGGER.info(
-    #     "CDC Tables : Schema %s, Table %s, Enabled %s, Object %s", *row,
-    # )
     return row[2]
 
 def verify_change_data_capture_databases(connection):
@@ -43,17 +40,17 @@ def verify_change_data_capture_databases(connection):
     )
     return row
 
-def get_object_id_by_table(connection, dbname, schema_name, table_name):
-    cur = connection.cursor()
-    query = "SELECT OBJECT_ID(N'" + dbname + "." + schema_name + "." + table_name + "') AS 'Object_ID'"
-    print(query)
-    cur.execute(query)
-    row = cur.fetchone()
+# def get_object_id_by_table(connection, dbname, schema_name, table_name):
+#     cur = connection.cursor()
+#     query = "SELECT OBJECT_ID(N'" + dbname + "." + schema_name + "." + table_name + "') AS 'Object_ID'"
+#     print(query)
+#     cur.execute(query)
+#     row = cur.fetchone()
 
-    LOGGER.info(
-        "Current Object ID : %s", *row,
-    )
-    return row
+#     LOGGER.info(
+#         "Current Object ID : %s", *row,
+#     )
+#     return row
 
 def get_lsn_extract_range(connection, schema_name, table_name,last_extract_datetime):
     cur = connection.cursor()
@@ -73,31 +70,40 @@ def get_lsn_extract_range(connection, schema_name, table_name,last_extract_datet
     cur.execute(query)
     row = cur.fetchone()
 
+    if row[2] is None:   # Test that the lsn_from is not NULL i.e. there is change data to process
+       ### TO_DO:  1. Modify the query to not have a where clause
+       ###         2. Use a SCN rather that date time as it is more accurate
+       ###         3. Check if the SCN from the state file is between the lsn_from and lsn_to
+       ###         4. Raise an error if last SCN is outside the range and there is change data available. This means the CDC has been purged in the source system. A full extract will be required.
+       LOGGER.info("No data available to process in CDC table cdc.%s_%s_CT", schema_name, table_name)
+    else:
+       LOGGER.info("Data available in cdc table cdc.%s_%s_CT from lsn %s", schema_name, table_name, row[3])
+
     return row
 
-def get_from_lsn(connection, capture_instance_name ):
-    cur = connection.cursor()
-    query = """select sys.fn_cdc_get_min_lsn ( '{}' ) """.format(capture_instance_name)
-    print(query)
-    cur.execute(query)
-    row = cur.fetchone()
+# def get_from_lsn(connection, capture_instance_name ):
+#     cur = connection.cursor()
+#     query = """select sys.fn_cdc_get_min_lsn ( '{}' ) """.format(capture_instance_name)
+#     print(query)
+#     cur.execute(query)
+#     row = cur.fetchone()
 
-    LOGGER.info(
-        "Current LSN ID : %s", *row,
-    )
-    return row 
+#     LOGGER.info(
+#         "Current LSN ID : %s", *row,
+#     )
+#     return row 
 
-def get_to_lsn(connection):
-    cur = connection.cursor()
-    query = """select sys.fn_cdc_get_max_lsn () """
-    print(query)
-    cur.execute(query)
-    row = cur.fetchone()
+# def get_to_lsn(connection):
+#     cur = connection.cursor()
+#     query = """select sys.fn_cdc_get_max_lsn () """
+#     print(query)
+#     cur.execute(query)
+#     row = cur.fetchone()
 
-    LOGGER.info(
-        "Max LSN ID : %s", *row,
-    )
-    return row 
+#     LOGGER.info(
+#         "Max LSN ID : %s", *row,
+#     )
+#     return row 
 
 def add_synthetic_keys_to_schema(catalog_entry):
    catalog_entry.schema.properties['_cdc_operation_type'] = Schema(
@@ -111,17 +117,17 @@ def add_synthetic_keys_to_schema(catalog_entry):
 
    return catalog_entry          
 
-def get_min_valid_version(connection, dbname, schema_name, table_name):
-    cur = connection.cursor()
-    query = "SELECT OBJECT_ID(N'" + dbname + "." + schema_name + "." + table_name + "') AS 'Object_ID'"
-    print(query)
-    cur.execute(query)
-    row = cur.fetchone()
+# def get_min_valid_version(connection, dbname, schema_name, table_name):
+#     cur = connection.cursor()
+#     query = "SELECT OBJECT_ID(N'" + dbname + "." + schema_name + "." + table_name + "') AS 'Object_ID'"
+#     print(query)
+#     cur.execute(query)
+#     row = cur.fetchone()
 
-    LOGGER.info(
-        "Current Object ID : %s", *row,
-    )
-    return row        
+#     LOGGER.info(
+#         "Current Object ID : %s", *row,
+#     )
+#     return row        
 
 #    with connect_with_backoff(conn_config) as open_conn:
 #        try:
@@ -143,9 +149,13 @@ def generate_bookmark_keys(catalog_entry):
     stream_metadata = md_map.get((), {})
     replication_method = stream_metadata.get("replication-method")
 
+    ### TO_DO: 
+    ### 1. check the use of the top three values above and the parameter value, seem to not be required.
+    ### 2. check the base_bookmark_keys required
     base_bookmark_keys = {
-        "last_pk_fetched",
-        "max_pk_values",
+        "last_lsn_fetched",
+        "max_lsn_values",
+        "lsn",
         "version",
         "initial_full_table_complete",
     }
@@ -164,31 +174,13 @@ def sync_table(mssql_conn, config, catalog_entry, state, columns, extended_colum
     bookmark = state.get("bookmarks", {}).get(catalog_entry.tap_stream_id, {})
     version_exists = True if "version" in bookmark else False
 
-    ### BEGIN NEW LOGIC FOR CDC
-    # result = get_change_data_capture_tables(mssql_conn)    
-    # LOGGER.info("Here is the tracking tables results %s", result)
-
-    # result2 = get_change_data_capture_databases(mssql_conn)
-    # LOGGER.info("Here is the tracking databases results %s", result2)
-
-    # AdventureWorks2016.HumanResources.Department
-    # result3 = get_object_id_by_table(mssql_conn, "AdventureWorks2016", "HumanResources", "Department")
-    # LOGGER.info("Here is the table object id result %s", result3)
-    
-
-    # from_lsn = get_from_lsn(mssql_conn, "HumanResources_Department")
-    # LOGGER.info("Here is the table min lsn id result %s", from_lsn)
-
-    # to_lsn = get_to_lsn(mssql_conn)
-    # LOGGER.info("Here is the table max lsn id result %s", to_lsn)
-
-    ### END LOGIC FOR CDC
-
     initial_full_table_complete = singer.get_bookmark(
         state, catalog_entry.tap_stream_id, "initial_full_table_complete"
     )
 
     state_version = singer.get_bookmark(state, catalog_entry.tap_stream_id, "version")
+    start_lsn = singer.get_bookmark(state, catalog_entry.tap_stream_id, "lsn")
+    print("XXXXXX The current start lsn is XXXXXX : " + str(start_lsn))
 
     activate_version_message = singer.ActivateVersionMessage(
         stream=catalog_entry.stream, version=stream_version
@@ -203,8 +195,10 @@ def sync_table(mssql_conn, config, catalog_entry, state, columns, extended_colum
         with open_conn.cursor() as cur:
             # select_sql = common.generate_select_sql(catalog_entry, columns)
             # start_lsn = min([singer.get_bookmark(state, s.tap_stream_id, 'lsn') for s in catalog_entry.stream])
+            print("State : " + str(state))
+            print("Stream : " + catalog_entry.tap_stream_id)
             start_lsn = singer.get_bookmark(state, catalog_entry.tap_stream_id, "lsn")
-            # print(start_lsn)
+            print("XXXXXX The current start lsn is XXXXXX : " + str(start_lsn))
             
             escaped_columns = [common.escape(c) for c in columns]
             escaped_table   = (catalog_entry.tap_stream_id).replace("-","_")
@@ -214,45 +208,48 @@ def sync_table(mssql_conn, config, catalog_entry, state, columns, extended_colum
             if not verify_change_data_capture_table(mssql_conn,schema_name,table_name):
                raise Exception("Error {}.{}: does not have change data capture enabled. Call EXEC sys.sp_cdc_enable_table with relevant parameters to enable CDC.".format(schema_name,table_name))
 
+            # Check to see what the LSN range of records are available to consume for the given table
             lsn_range = get_lsn_extract_range(mssql_conn, schema_name, table_name,"2016-08-01T23:00:00")
-            lsn_from = str(lsn_range[2].hex())
-            lsn_to   = str(lsn_range[3].hex())
 
-            LOGGER.info("Here is the tracking tables results from_lsn_datetime %s, to_lsn_datetime %s, from_lsn %s, to_lsn %s, lsn_to_string %s", lsn_range[0],lsn_range[1],lsn_range[2],lsn_range[3],lsn_range[4])
+            if lsn_range[2] is not None:   # Test to see if there are any change records to process
+               lsn_from = str(lsn_range[2].hex())
+               lsn_to   = str(lsn_range[3].hex())
 
-            select_sql = """DECLARE @from_lsn binary (10), @to_lsn binary (10)
-            
-                            SET @from_lsn = {}
-                            SET @to_lsn = {}
+               LOGGER.info("Here is the tracking tables results from_lsn_datetime %s, to_lsn_datetime %s, from_lsn %s, to_lsn %s, lsn_to_string %s", lsn_range[0],lsn_range[1],lsn_range[2],lsn_range[3],lsn_range[4])
 
-                            SELECT {}
-                                  ,case __$operation
-                                    when 2 then 'I'
-                                    when 4 then 'U'
-                                    when 1 then 'D'
+               select_sql = """DECLARE @from_lsn binary (10), @to_lsn binary (10)
+               
+                               SET @from_lsn = {}
+                               SET @to_lsn = {}
+
+                               SELECT {}
+                                   ,case __$operation
+                                       when 2 then 'I'
+                                       when 4 then 'U'
+                                       when 1 then 'D'
                                    end _cdc_operation_type
-                                  , sys.fn_cdc_map_lsn_to_time(__$start_lsn) _cdc_lsn_commit_timestamp
-                                  , case __$operation
-                                     when 1 then sys.fn_cdc_map_lsn_to_time(__$start_lsn)
-                                    else null
-                                    end _cdc_lsn_deleted_at
-                                  , 'Testing' _cdc_lsn_hex_value
-                            FROM cdc.fn_cdc_get_all_changes_{}(@from_lsn, @to_lsn, 'all')
-                            WHERE __$start_lsn > {}
-                            ORDER BY __$seqval
-                            ;""".format(py_bin_to_mssql(lsn_from), py_bin_to_mssql(lsn_to), ",".join(escaped_columns), escaped_table, py_bin_to_mssql(lsn_from) )
+                                   , sys.fn_cdc_map_lsn_to_time(__$start_lsn) _cdc_lsn_commit_timestamp
+                                   , case __$operation
+                                       when 1 then sys.fn_cdc_map_lsn_to_time(__$start_lsn)
+                                       else null
+                                       end _cdc_lsn_deleted_at
+                                   , 'Testing' _cdc_lsn_hex_value
+                               FROM cdc.fn_cdc_get_all_changes_{}(@from_lsn, @to_lsn, 'all')
+                               WHERE __$start_lsn > {} and __$start_lsn <= {}
+                               ORDER BY __$seqval
+                               ;""".format(py_bin_to_mssql(lsn_from), py_bin_to_mssql(lsn_to), ",".join(escaped_columns), escaped_table, py_bin_to_mssql(lsn_from), py_bin_to_mssql(lsn_to) )
 
-            params = {}
+               params = {}
 
-            common.sync_query(
-                cur, catalog_entry, state, select_sql, extended_columns, stream_version, params
-            )
+               common.sync_query(
+                   cur, catalog_entry, state, select_sql, extended_columns, stream_version, params
+               )
             
-            state = singer.write_bookmark(state, catalog_entry.tap_stream_id, 'lsn', lsn_to)
-            singer.write_message(singer.StateMessage(value=copy.deepcopy(state)))
+            #    state = singer.write_bookmark(state, catalog_entry.tap_stream_id, 'lsn', lsn_to)
+            #    singer.write_message(singer.StateMessage(value=copy.deepcopy(state)))
 
-    # clear max pk value and last pk fetched upon successful sync
-    # singer.clear_bookmark(state, catalog_entry.tap_stream_id, "max_pk_values")
-    # singer.clear_bookmark(state, catalog_entry.tap_stream_id, "last_pk_fetched")
+    # clear max lsn value and last lsn fetched upon successful sync
+    singer.clear_bookmark(state, catalog_entry.tap_stream_id, "max_lsn_values")
+    singer.clear_bookmark(state, catalog_entry.tap_stream_id, "last_lsn_fetched")
 
     singer.write_message(activate_version_message)

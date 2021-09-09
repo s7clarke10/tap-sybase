@@ -525,6 +525,7 @@ def sync_non_binlog_streams(mssql_conn, non_binlog_catalog, config, state):
         replication_method = md_map.get((), {}).get("replication-method")
         replication_key = md_map.get((), {}).get("replication-key")
         primary_keys = md_map.get((), {}).get("table-key-properties")
+        start_lsn = md_map.get((), {}).get("lsn")
         LOGGER.info(f"Table {catalog_entry.table} proposes {replication_method} sync")
         if replication_method == "INCREMENTAL" and not replication_key:
             LOGGER.info(
@@ -534,6 +535,11 @@ def sync_non_binlog_streams(mssql_conn, non_binlog_catalog, config, state):
         if replication_method == "INCREMENTAL" and not primary_keys:
             LOGGER.info(f"No primary key for {catalog_entry.table}, using full table replication")
             replication_method = "FULL_TABLE"
+        if replication_method == "LOG_BASED" and not start_lsn:
+            LOGGER.info(
+                f"No initial load for {catalog_entry.table}, using full table replication"
+            )
+            replication_method = "FULL_TABLE"            
         LOGGER.info(f"Table {catalog_entry.table} will use {replication_method} sync")
 
 
