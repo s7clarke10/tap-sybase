@@ -312,6 +312,37 @@ def desired_columns(selected, table_schema):
 
 
 def is_valid_currently_syncing_stream(selected_stream, state):
+    stream_metadata = metadata.to_map(selected_stream.metadata)
+    replication_method = stream_metadata.get((), {}).get('replication-method')
+
+    if replication_method != 'LOG_BASED':
+        return True
+
+    if replication_method == 'LOG_BASED' and cdc_stream_requires_historical(selected_stream, state):
+        return True
+
+    return False
+
+def cdc_stream_requires_historical(catalog_entry, state):
+    # log_file = singer.get_bookmark(state,
+    #                                catalog_entry.tap_stream_id,
+    #                                'log_file')
+
+    current_lsn = singer.get_bookmark(state,
+                                  catalog_entry.tap_stream_id,
+                                  'lsn')
+
+    max_lsn_values = singer.get_bookmark(state,
+                                        catalog_entry.tap_stream_id,
+                                        'max_lsn_values')
+
+    last_lsn_fetched = singer.get_bookmark(state,
+                                          catalog_entry.tap_stream_id,
+                                          'last_lsn_fetched')
+
+    if (current_lsn) and (not max_lsn_values and not last_lsn_fetched):
+        return False
+
     return True
 
 
@@ -359,7 +390,7 @@ def resolve_catalog(discovered_catalog, streams_to_sync):
     return result
 
 
-def get_non_binlog_streams(mssql_conn, catalog, config, state):
+def get_non_cdc_streams(mssql_conn, catalog, config, state):
     """Returns the Catalog of data we're going to sync for all SELECT-based
     streams (i.e. INCREMENTAL, FULL_TABLE, and LOG_BASED that require a historical
     sync). LOG_BASED streams that require a historical sync are inferred from lack
@@ -397,8 +428,20 @@ def get_non_binlog_streams(mssql_conn, catalog, config, state):
         stream_state = state.get("bookmarks", {}).get(stream.tap_stream_id)
 
         if not stream_state:
+            if replication_method == 'LOG_BASED':
+                LOGGER.info("LOG_BASED stream %s requires full historical sync", stream.tap_stream_id)
+
             streams_without_state.append(stream)
-        else:
+        elif stream_state and replication_method == 'LOG_BASED' and cdc_stream_requires_historical(stream, state):
+            is_view = common.get_is_view(stream)
+
+            if is_view:
+                raise Exception("Unable to replicate stream({}) with cdc because it is a view.".format(stream.stream))
+
+            LOGGER.info("LOG_BASED stream %s will resume its historical sync", stream.tap_stream_id)
+
+            streams_with_state.append(stream)
+        elif stream_state and replication_method != 'LOG_BASED':
             streams_with_state.append(stream)
 
     # If the state says we were in the middle of processing a stream, skip
@@ -430,18 +473,21 @@ def get_non_binlog_streams(mssql_conn, catalog, config, state):
     return resolve_catalog(discovered, streams_to_sync)
 
 
-def get_binlog_streams(mssql_conn, catalog, config, state):
+def get_cdc_streams(mssql_conn, catalog, config, state):
     discovered = discover_catalog(mssql_conn, config)
 
     selected_streams = list(filter(lambda s: common.stream_is_selected(s), catalog.streams))
-    binlog_streams = []
+    cdc_streams = []
 
     for stream in selected_streams:
         stream_metadata = metadata.to_map(stream.metadata)
         replication_method = stream_metadata.get((), {}).get("replication-method")
         stream_state = state.get("bookmarks", {}).get(stream.tap_stream_id)
 
-    return resolve_catalog(discovered, binlog_streams)
+        if replication_method == 'LOG_BASED' and not cdc_stream_requires_historical(stream, state):
+            cdc_streams.append(stream)
+
+    return resolve_catalog(discovered, cdc_streams)
 
 
 def write_schema_message(catalog_entry, bookmark_properties=[]):
@@ -468,6 +514,24 @@ def do_sync_incremental(mssql_conn, config, catalog_entry, state, columns):
 
     singer.write_message(singer.StateMessage(value=copy.deepcopy(state)))
 
+def do_sync_historical_log(mssql_conn, config, catalog_entry, state, columns):
+    key_properties = common.get_key_properties(catalog_entry)
+    mssql_conn = MSSQLConnection(config)
+
+    write_schema_message(catalog_entry)
+
+    stream_version = common.get_stream_version(catalog_entry.tap_stream_id, state)
+
+    full_table.sync_table(mssql_conn, config, catalog_entry, state, columns, stream_version)
+
+    # Prefer initial_full_table_complete going forward
+    singer.clear_bookmark(state, catalog_entry.tap_stream_id, "version")
+
+    state = singer.write_bookmark(
+        state, catalog_entry.tap_stream_id, "initial_full_table_complete", True
+    )
+
+    singer.write_message(singer.StateMessage(value=copy.deepcopy(state)))
 
 def do_sync_full_table(mssql_conn, config, catalog_entry, state, columns):
     key_properties = common.get_key_properties(catalog_entry)
@@ -504,10 +568,10 @@ def do_sync_log_based(mssql_conn, config, catalog_entry, state, columns):
 
     singer.write_message(singer.StateMessage(value=copy.deepcopy(state)))
 
-def sync_non_binlog_streams(mssql_conn, non_binlog_catalog, config, state):
+def sync_non_cdc_streams(mssql_conn, non_cdc_catalog, config, state):
     mssql_conn = MSSQLConnection(config)
 
-    for catalog_entry in non_binlog_catalog.streams:
+    for catalog_entry in non_cdc_catalog.streams:
         columns = list(catalog_entry.schema.properties.keys())
 
         if not columns:
@@ -525,7 +589,7 @@ def sync_non_binlog_streams(mssql_conn, non_binlog_catalog, config, state):
         replication_method = md_map.get((), {}).get("replication-method")
         replication_key = md_map.get((), {}).get("replication-key")
         primary_keys = md_map.get((), {}).get("table-key-properties")
-        start_lsn = md_map.get((), {}).get("lsn")
+        start_lsn = md_map.get((), {}).get("lsn")        
         LOGGER.info(f"Table {catalog_entry.table} proposes {replication_method} sync")
         if replication_method == "INCREMENTAL" and not replication_key:
             LOGGER.info(
@@ -539,7 +603,7 @@ def sync_non_binlog_streams(mssql_conn, non_binlog_catalog, config, state):
             LOGGER.info(
                 f"No initial load for {catalog_entry.table}, using full table replication"
             )
-            replication_method = "FULL_TABLE"            
+            replication_method = "FULL_TABLE"          
         LOGGER.info(f"Table {catalog_entry.table} will use {replication_method} sync")
 
 
@@ -557,20 +621,62 @@ def sync_non_binlog_streams(mssql_conn, non_binlog_catalog, config, state):
                 do_sync_full_table(mssql_conn, config, catalog_entry, state, columns)
             elif replication_method == "LOG_BASED":
                 LOGGER.info(f"syncing {catalog_entry.table} cdc tables")
-                do_sync_log_based(mssql_conn, config, catalog_entry, state, columns)                
+                # do_sync_log_based(mssql_conn, config, catalog_entry, state, columns)
+                do_sync_full_table(mssql_conn, config, catalog_entry, state, columns)               
             else:
                 raise Exception("only INCREMENTAL, LOG_BASED and FULL TABLE replication methods are supported")
 
     state = singer.set_currently_syncing(state, None)
     singer.write_message(singer.StateMessage(value=copy.deepcopy(state)))
 
+def sync_cdc_streams(mssql_conn, cdc_catalog, config, state):
+    mssql_conn = MSSQLConnection(config)
+
+    if cdc_catalog.streams:
+        for catalog_entry in cdc_catalog.streams:
+            columns = list(catalog_entry.schema.properties.keys())
+            if not columns:
+                LOGGER.warning(
+                    "There are no columns selected for stream %s, skipping it.", catalog_entry.stream
+                )
+                continue
+
+            state = singer.set_currently_syncing(state, catalog_entry.tap_stream_id)
+
+            # Emit a state message to indicate that we've started this stream
+            singer.write_message(singer.StateMessage(value=copy.deepcopy(state)))
+
+            md_map = metadata.to_map(catalog_entry.metadata)
+            replication_method = md_map.get((), {}).get("replication-method")
+            replication_key = md_map.get((), {}).get("replication-key")
+            primary_keys = md_map.get((), {}).get("table-key-properties")
+            LOGGER.info(f"Table {catalog_entry.table} proposes {replication_method} sync")
+            LOGGER.info(f"Table {catalog_entry.table} will use {replication_method} sync")
+
+            database_name = common.get_database_name(catalog_entry)
+
+            with metrics.job_timer('table_cdc_sync') as timer:
+                timer.tags["database"] = database_name
+                timer.tags["table"] = catalog_entry.table
+
+                if replication_method == "LOG_BASED":
+                    LOGGER.info(f"syncing {catalog_entry.table} cdc tables")
+                    do_sync_log_based(mssql_conn, config, catalog_entry, state, columns)                
+                else:
+                    raise Exception("only LOG_BASED methods are supported for CDC")
+
+        state = singer.set_currently_syncing(state, None)
+        singer.write_message(singer.StateMessage(value=copy.deepcopy(state)))                    
 
 def do_sync(mssql_conn, config, catalog, state):
     LOGGER.info("Beginning sync")
-    non_binlog_catalog = get_non_binlog_streams(mssql_conn, catalog, config, state)
-    for entry in non_binlog_catalog.streams:
+    non_cdc_catalog = get_non_cdc_streams(mssql_conn, catalog, config, state)
+    cdc_catalog = get_cdc_streams(mssql_conn, catalog, config, state)
+
+    for entry in non_cdc_catalog.streams:
         LOGGER.info(f"Need to sync {entry.table}")
-    sync_non_binlog_streams(mssql_conn, non_binlog_catalog, config, state)
+    sync_non_cdc_streams(mssql_conn, non_cdc_catalog, config, state)
+    sync_cdc_streams(mssql_conn, cdc_catalog, config, state)
 
 
 def log_server_params(mssql_conn):

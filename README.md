@@ -455,6 +455,7 @@ $ python setup.py install
 To run the __init__.py python program in debug mode, you need to do the following two steps. Note: This was run within a Docker Container in Visual Studio Code.
 
 1. Create a .vscode/launch.json file. Note: The parameters config.json and properties.json should point to the files you have generated in previous steps above.
+   If you want to test state, include the state parameter as shown below and prepare an appropriate state file as per the instructions in an earlier section.
 
 ```json
 {
@@ -468,6 +469,7 @@ To run the __init__.py python program in debug mode, you need to do the followin
             "args": [
                 "-c", "config.json",
                 "--properties", "properties.json"
+                "--state", "state.json"
             ]
         }
     ]
