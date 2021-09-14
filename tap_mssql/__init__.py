@@ -518,11 +518,15 @@ def do_sync_historical_log(mssql_conn, config, catalog_entry, state, columns):
     key_properties = common.get_key_properties(catalog_entry)
     mssql_conn = MSSQLConnection(config)
 
+    # Add additional keys to the schema
+    log_based.add_synthetic_keys_to_schema(catalog_entry)
+
     write_schema_message(catalog_entry)
 
     stream_version = common.get_stream_version(catalog_entry.tap_stream_id, state)
 
-    full_table.sync_table(mssql_conn, config, catalog_entry, state, columns, stream_version)
+    # full_table.sync_table(mssql_conn, config, catalog_entry, state, columns, stream_version)
+    log_based.sync_historic_table(mssql_conn, config, catalog_entry, state, columns, stream_version)    
 
     # Prefer initial_full_table_complete going forward
     singer.clear_bookmark(state, catalog_entry.tap_stream_id, "version")
@@ -559,12 +563,11 @@ def do_sync_log_based(mssql_conn, config, catalog_entry, state, columns):
     replication_key = md_map.get((), {}).get("replication-key")
     # Add additional keys to the schema
     log_based.add_synthetic_keys_to_schema(catalog_entry)
-    # Add additional keys to the columns
-    extended_columns = columns + ['_cdc_operation_type', '_cdc_lsn_commit_timestamp', '_cdc_lsn_deleted_at', '_cdc_lsn_hex_value']
+
     write_schema_message(catalog_entry=catalog_entry, bookmark_properties=[replication_key])
     LOGGER.info("Schema written")
     stream_version = common.get_stream_version(catalog_entry.tap_stream_id, state)
-    log_based.sync_table(mssql_conn, config, catalog_entry, state, columns, extended_columns, stream_version)
+    log_based.sync_table(mssql_conn, config, catalog_entry, state, columns, stream_version)
 
     singer.write_message(singer.StateMessage(value=copy.deepcopy(state)))
 
@@ -603,8 +606,8 @@ def sync_non_cdc_streams(mssql_conn, non_cdc_catalog, config, state):
             LOGGER.info(
                 f"No initial load for {catalog_entry.table}, using full table replication"
             )
-            replication_method = "FULL_TABLE"          
-        LOGGER.info(f"Table {catalog_entry.table} will use {replication_method} sync")
+        else:        
+            LOGGER.info(f"Table {catalog_entry.table} will use {replication_method} sync")
 
 
         database_name = common.get_database_name(catalog_entry)
@@ -621,8 +624,7 @@ def sync_non_cdc_streams(mssql_conn, non_cdc_catalog, config, state):
                 do_sync_full_table(mssql_conn, config, catalog_entry, state, columns)
             elif replication_method == "LOG_BASED":
                 LOGGER.info(f"syncing {catalog_entry.table} cdc tables")
-                # do_sync_log_based(mssql_conn, config, catalog_entry, state, columns)
-                do_sync_full_table(mssql_conn, config, catalog_entry, state, columns)               
+                do_sync_historical_log(mssql_conn, config, catalog_entry, state, columns)               
             else:
                 raise Exception("only INCREMENTAL, LOG_BASED and FULL TABLE replication methods are supported")
 

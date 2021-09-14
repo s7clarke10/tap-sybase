@@ -93,17 +93,17 @@ def get_lsn_extract_range(connection, schema_name, table_name,last_extract_datet
 #     )
 #     return row 
 
-# def get_to_lsn(connection):
-#     cur = connection.cursor()
-#     query = """select sys.fn_cdc_get_max_lsn () """
-#     print(query)
-#     cur.execute(query)
-#     row = cur.fetchone()
+def get_to_lsn(connection):
+    cur = connection.cursor()
+    query = """select sys.fn_cdc_get_max_lsn () """
 
-#     LOGGER.info(
-#         "Max LSN ID : %s", *row,
-#     )
-#     return row 
+    cur.execute(query)
+    row = cur.fetchone()
+
+    LOGGER.info(
+        "Max LSN ID : %s", *row,
+    )
+    return row 
 
 def add_synthetic_keys_to_schema(catalog_entry):
    catalog_entry.schema.properties['_cdc_operation_type'] = Schema(
@@ -164,12 +164,14 @@ def generate_bookmark_keys(catalog_entry):
 
     return bookmark_keys
 
-
-def sync_table(mssql_conn, config, catalog_entry, state, columns, extended_columns, stream_version):
+def sync_historic_table(mssql_conn, config, catalog_entry, state, columns, stream_version):
     mssql_conn = MSSQLConnection(config)
     common.whitelist_bookmark_keys(
         generate_bookmark_keys(catalog_entry), catalog_entry.tap_stream_id, state
     )
+
+    # Add additional keys to the columns
+    extended_columns = columns + ['_cdc_operation_type', '_cdc_lsn_commit_timestamp', '_cdc_lsn_deleted_at', '_cdc_lsn_hex_value']    
 
     bookmark = state.get("bookmarks", {}).get(catalog_entry.tap_stream_id, {})
     version_exists = True if "version" in bookmark else False
@@ -179,8 +181,6 @@ def sync_table(mssql_conn, config, catalog_entry, state, columns, extended_colum
     )
 
     state_version = singer.get_bookmark(state, catalog_entry.tap_stream_id, "version")
-    start_lsn = singer.get_bookmark(state, catalog_entry.tap_stream_id, "lsn")
-    print("XXXXXX The current start lsn is XXXXXX : " + str(start_lsn))
 
     activate_version_message = singer.ActivateVersionMessage(
         stream=catalog_entry.stream, version=stream_version
@@ -193,12 +193,74 @@ def sync_table(mssql_conn, config, catalog_entry, state, columns, extended_colum
 
     with connect_with_backoff(mssql_conn) as open_conn:
         with open_conn.cursor() as cur:
-            # select_sql = common.generate_select_sql(catalog_entry, columns)
+
+            escaped_columns = [common.escape(c) for c in columns]
+            table_name      = catalog_entry.table
+            schema_name     = common.get_database_name(catalog_entry)
+
+            if not verify_change_data_capture_table(mssql_conn,schema_name,table_name):
+               raise Exception("Error {}.{}: does not have change data capture enabled. Call EXEC sys.sp_cdc_enable_table with relevant parameters to enable CDC.".format(schema_name,table_name))            
+
+            # Store the current database lsn number, will use this to store at the end of the initial load.
+            # Note: Recommend no transactions loaded when the initial loads are performed.
+            lsn_to = str(get_to_lsn(mssql_conn)[0].hex())
+
+            select_sql = """
+                            SELECT {}
+                                ,'I' _cdc_operation_type
+                                , '1900-01-01 00:00:00' _cdc_lsn_commit_timestamp
+                                , null _cdc_lsn_deleted_at
+                                , 'Testing' _cdc_lsn_hex_value
+                            FROM {}.{}
+                            ;""".format(",".join(escaped_columns), schema_name, table_name)          
+            params = {}
+
+            common.sync_query(
+                cur, catalog_entry, state, select_sql, extended_columns, stream_version, params
+            )
+            state = singer.write_bookmark(state, catalog_entry.tap_stream_id, 'lsn', lsn_to)
+
+    # store the state of the table lsn's after the initial load ready for the next CDC run
+    singer.write_message(singer.StateMessage(value=copy.deepcopy(state)))
+
+    # clear max pk value and last pk fetched upon successful sync
+    singer.clear_bookmark(state, catalog_entry.tap_stream_id, "max_pk_values")
+    singer.clear_bookmark(state, catalog_entry.tap_stream_id, "last_pk_fetched")
+
+    singer.write_message(activate_version_message)
+
+def sync_table(mssql_conn, config, catalog_entry, state, columns, stream_version):
+    mssql_conn = MSSQLConnection(config)
+    common.whitelist_bookmark_keys(
+        generate_bookmark_keys(catalog_entry), catalog_entry.tap_stream_id, state
+    )
+
+    # Add additional keys to the columns
+    extended_columns = columns + ['_cdc_operation_type', '_cdc_lsn_commit_timestamp', '_cdc_lsn_deleted_at', '_cdc_lsn_hex_value']
+
+    bookmark = state.get("bookmarks", {}).get(catalog_entry.tap_stream_id, {})
+    version_exists = True if "version" in bookmark else False
+
+    initial_full_table_complete = singer.get_bookmark(
+        state, catalog_entry.tap_stream_id, "initial_full_table_complete"
+    )
+
+    state_version = singer.get_bookmark(state, catalog_entry.tap_stream_id, "version")
+
+    activate_version_message = singer.ActivateVersionMessage(
+        stream=catalog_entry.stream, version=stream_version
+    )
+
+    # For the initial replication, emit an ACTIVATE_VERSION message
+    # at the beginning so the records show up right away.
+    if not initial_full_table_complete and not (version_exists and state_version is None):
+        singer.write_message(activate_version_message)
+
+    with connect_with_backoff(mssql_conn) as open_conn:
+        with open_conn.cursor() as cur:
+
             # start_lsn = min([singer.get_bookmark(state, s.tap_stream_id, 'lsn') for s in catalog_entry.stream])
-            print("State : " + str(state))
-            print("Stream : " + catalog_entry.tap_stream_id)
-            start_lsn = singer.get_bookmark(state, catalog_entry.tap_stream_id, "lsn")
-            print("XXXXXX The current start lsn is XXXXXX : " + str(start_lsn))
+            state_last_lsn = singer.get_bookmark(state, catalog_entry.tap_stream_id, "lsn")
             
             escaped_columns = [common.escape(c) for c in columns]
             escaped_table   = (catalog_entry.tap_stream_id).replace("-","_")
@@ -208,17 +270,21 @@ def sync_table(mssql_conn, config, catalog_entry, state, columns, extended_colum
             if not verify_change_data_capture_table(mssql_conn,schema_name,table_name):
                raise Exception("Error {}.{}: does not have change data capture enabled. Call EXEC sys.sp_cdc_enable_table with relevant parameters to enable CDC.".format(schema_name,table_name))
 
-            # Check to see what the LSN range of records are available to consume for the given table
             lsn_range = get_lsn_extract_range(mssql_conn, schema_name, table_name,"2016-08-01T23:00:00")
 
             if lsn_range[2] is not None:   # Test to see if there are any change records to process
                lsn_from = str(lsn_range[2].hex())
                lsn_to   = str(lsn_range[3].hex())
 
+               if lsn_from <= state_last_lsn:
+                  LOGGER.info("The last lsn processed as per the state file %s, minimum available lsn for extract table %s", state_last_lsn, lsn_from)
+               else:
+                  raise Exception("Error {}.{}: CDC changes have expired, the minimum lsn is %s, the last processed lsn is %s. Recommend a full load as there may be missing data.".format(schema_name, table_name, lsn_from, state_last_lsn ))                
+
                LOGGER.info("Here is the tracking tables results from_lsn_datetime %s, to_lsn_datetime %s, from_lsn %s, to_lsn %s, lsn_to_string %s", lsn_range[0],lsn_range[1],lsn_range[2],lsn_range[3],lsn_range[4])
 
                select_sql = """DECLARE @from_lsn binary (10), @to_lsn binary (10)
-               
+                    
                                SET @from_lsn = {}
                                SET @to_lsn = {}
 
@@ -237,7 +303,7 @@ def sync_table(mssql_conn, config, catalog_entry, state, columns, extended_colum
                                FROM cdc.fn_cdc_get_all_changes_{}(@from_lsn, @to_lsn, 'all')
                                WHERE __$start_lsn > {} and __$start_lsn <= {}
                                ORDER BY __$seqval
-                               ;""".format(py_bin_to_mssql(lsn_from), py_bin_to_mssql(lsn_to), ",".join(escaped_columns), escaped_table, py_bin_to_mssql(lsn_from), py_bin_to_mssql(lsn_to) )
+                               ;""".format(py_bin_to_mssql(state_last_lsn), py_bin_to_mssql(lsn_to), ",".join(escaped_columns), escaped_table, py_bin_to_mssql(lsn_from), py_bin_to_mssql(lsn_to) )
 
                params = {}
 
@@ -245,8 +311,8 @@ def sync_table(mssql_conn, config, catalog_entry, state, columns, extended_colum
                    cur, catalog_entry, state, select_sql, extended_columns, stream_version, params
                )
             
-            #    state = singer.write_bookmark(state, catalog_entry.tap_stream_id, 'lsn', lsn_to)
-            #    singer.write_message(singer.StateMessage(value=copy.deepcopy(state)))
+               state = singer.write_bookmark(state, catalog_entry.tap_stream_id, 'lsn', lsn_to)
+               singer.write_message(singer.StateMessage(value=copy.deepcopy(state)))
 
     # clear max lsn value and last lsn fetched upon successful sync
     singer.clear_bookmark(state, catalog_entry.tap_stream_id, "max_lsn_values")
