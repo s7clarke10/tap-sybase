@@ -52,7 +52,7 @@ def verify_change_data_capture_databases(connection):
 #     )
 #     return row
 
-def get_lsn_extract_range(connection, schema_name, table_name,last_extract_datetime):
+def get_lsn_extract_range(connection, schema_name, table_name, last_extract_datetime):
     cur = connection.cursor()
     query = """DECLARE @load_timestamp datetime
                SET @load_timestamp = '{}'
@@ -78,6 +78,22 @@ def get_lsn_extract_range(connection, schema_name, table_name,last_extract_datet
        LOGGER.info("No data available to process in CDC table cdc.%s_%s_CT", schema_name, table_name)
     else:
        LOGGER.info("Data available in cdc table cdc.%s_%s_CT from lsn %s", schema_name, table_name, row[3])
+
+    return row
+
+def get_lsn_available_range(connection, capture_instance_name ):
+    cur = connection.cursor()
+    query = """SELECT sys.fn_cdc_get_min_lsn ( '{}' ) lsn_from
+                    , sys.fn_cdc_get_max_lsn () lsn_to
+               ;
+            """.format(capture_instance_name)
+    cur.execute(query)
+    row = cur.fetchone()
+
+    if row[0] is None:   # Test that the lsn_from is not NULL i.e. there is change data to process
+       LOGGER.info("No data available to process in CDC table %s", capture_instance_name)
+    else:
+       LOGGER.info("Data available in cdc table %s from lsn %s", capture_instance_name, row[0])
 
     return row
 
@@ -210,7 +226,7 @@ def sync_historic_table(mssql_conn, config, catalog_entry, state, columns, strea
                                 ,'I' _cdc_operation_type
                                 , '1900-01-01 00:00:00' _cdc_lsn_commit_timestamp
                                 , null _cdc_lsn_deleted_at
-                                , 'Testing' _cdc_lsn_hex_value
+                                , '00000000000000000000' _cdc_lsn_hex_value
                             FROM {}.{}
                             ;""".format(",".join(escaped_columns), schema_name, table_name)          
             params = {}
@@ -263,25 +279,30 @@ def sync_table(mssql_conn, config, catalog_entry, state, columns, stream_version
             state_last_lsn = singer.get_bookmark(state, catalog_entry.tap_stream_id, "lsn")
             
             escaped_columns = [common.escape(c) for c in columns]
-            escaped_table   = (catalog_entry.tap_stream_id).replace("-","_")
             table_name      = catalog_entry.table
             schema_name     = common.get_database_name(catalog_entry)
+            schema_table   = schema_name + "_" + table_name
 
             if not verify_change_data_capture_table(mssql_conn,schema_name,table_name):
                raise Exception("Error {}.{}: does not have change data capture enabled. Call EXEC sys.sp_cdc_enable_table with relevant parameters to enable CDC.".format(schema_name,table_name))
 
-            lsn_range = get_lsn_extract_range(mssql_conn, schema_name, table_name,"2016-08-01T23:00:00")
+            # lsn_range = get_lsn_extract_range(mssql_conn, schema_name, table_name,"2016-08-01T23:00:00")
+            lsn_range = get_lsn_available_range(mssql_conn,schema_table)
 
-            if lsn_range[2] is not None:   # Test to see if there are any change records to process
-               lsn_from = str(lsn_range[2].hex())
-               lsn_to   = str(lsn_range[3].hex())
+            if lsn_range[0] is not None:   # Test to see if there are any change records to process
+               lsn_from = str(lsn_range[0].hex())
+               lsn_to   = str(lsn_range[1].hex())
+            # if lsn_range[2] is not None:   # Test to see if there are any change records to process
+            #    lsn_from = str(lsn_range[2].hex())
+            #    lsn_to   = str(lsn_range[3].hex())
 
                if lsn_from <= state_last_lsn:
                   LOGGER.info("The last lsn processed as per the state file %s, minimum available lsn for extract table %s", state_last_lsn, lsn_from)
                else:
                   raise Exception("Error {}.{}: CDC changes have expired, the minimum lsn is %s, the last processed lsn is %s. Recommend a full load as there may be missing data.".format(schema_name, table_name, lsn_from, state_last_lsn ))                
 
-               LOGGER.info("Here is the tracking tables results from_lsn_datetime %s, to_lsn_datetime %s, from_lsn %s, to_lsn %s, lsn_to_string %s", lsn_range[0],lsn_range[1],lsn_range[2],lsn_range[3],lsn_range[4])
+               LOGGER.info("Here is the tracking tables results from_lsn %s, to_lsn %s", lsn_range[0],lsn_range[1])
+            #    LOGGER.info("Here is the tracking tables results from_lsn_datetime %s, to_lsn_datetime %s, from_lsn %s, to_lsn %s, lsn_to_string %s", lsn_range[0],lsn_range[1],lsn_range[2],lsn_range[3],lsn_range[4])
 
                select_sql = """DECLARE @from_lsn binary (10), @to_lsn binary (10)
                     
@@ -303,7 +324,7 @@ def sync_table(mssql_conn, config, catalog_entry, state, columns, stream_version
                                FROM cdc.fn_cdc_get_all_changes_{}(@from_lsn, @to_lsn, 'all')
                                WHERE __$start_lsn > {} and __$start_lsn <= {}
                                ORDER BY __$seqval
-                               ;""".format(py_bin_to_mssql(state_last_lsn), py_bin_to_mssql(lsn_to), ",".join(escaped_columns), escaped_table, py_bin_to_mssql(lsn_from), py_bin_to_mssql(lsn_to) )
+                               ;""".format(py_bin_to_mssql(state_last_lsn), py_bin_to_mssql(lsn_to), ",".join(escaped_columns), schema_table, py_bin_to_mssql(lsn_from), py_bin_to_mssql(lsn_to) )
 
                params = {}
 
