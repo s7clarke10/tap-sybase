@@ -5,6 +5,7 @@ import copy
 import datetime
 import singer
 import time
+import pytz
 import uuid
 
 import singer.metrics as metrics
@@ -12,6 +13,8 @@ from singer import metadata
 from singer import utils
 
 LOGGER = singer.get_logger()
+
+LOCAL_DB_TIME_ZONE = ""
 
 
 def escape(string):
@@ -89,21 +92,49 @@ def generate_select_sql(catalog_entry, columns):
     select_sql = select_sql.replace("%", "%%")
     return select_sql
 
+def to_utc_datetime_str(val):
+    if isinstance(val, datetime.datetime):
+        the_datetime = val
+    elif isinstance(val, datetime.date):
+        the_datetime = datetime.datetime.combine(val, datetime.datetime.min.time())
+
+    elif isinstance(val, datetime.timedelta):
+        epoch = datetime.datetime.utcfromtimestamp(0)
+        the_datetime = epoch + val
+
+    else:
+        raise ValueError("{!r} is not a valid date or time type".format(val))
+
+    if the_datetime.tzinfo == None:
+        # The mssql-replication library creates naive date and datetime objects
+        # which are based on the mssql local timezone thus we must set tzinfo accordingly
+
+        #NB> this code will only work correctly when the local timezone is set to the timezone the database is operating under
+        local_timezone = pytz.timezone(LOCAL_DB_TIME_ZONE)
+        utc_timezone   = pytz.timezone('UTC')
+
+        localized_timestamp = local_timezone.localize(the_datetime)
+        the_datetime = localized_timestamp.astimezone(utc_timezone)
+
+    return utils.strftime(the_datetime.astimezone(tz=pytz.UTC))
 
 def row_to_singer_record(catalog_entry, version, row, columns, time_extracted):
     row_to_persist = ()
     for idx, elem in enumerate(row):
         property_type = catalog_entry.schema.properties[columns[idx]].type
         if isinstance(elem, datetime.datetime):
-            row_to_persist += (elem.isoformat() + "+00:00",)
+            # row_to_persist += (elem.isoformat() + "+00:00",)
+            row_to_persist += (to_utc_datetime_str(elem),)
 
         elif isinstance(elem, datetime.date):
-            row_to_persist += (elem.isoformat() + "T00:00:00+00:00",)
+            # row_to_persist += (elem.isoformat() + "T00:00:00+00:00",)
+            row_to_persist += (to_utc_datetime_str(elem),)
 
         elif isinstance(elem, datetime.timedelta):
             epoch = datetime.datetime.utcfromtimestamp(0)
             timedelta_from_epoch = epoch + elem
-            row_to_persist += (timedelta_from_epoch.isoformat() + "+00:00",)
+            # row_to_persist += (timedelta_from_epoch.isoformat() + "+00:00",)
+            row_to_persist += (to_utc_datetime_str(elem),)
 
         elif isinstance(elem, bytes):
             # for BIT value, treat 0 as False and anything else as True
