@@ -224,7 +224,7 @@ def sync_historic_table(mssql_conn, config, catalog_entry, state, columns, strea
             select_sql = """
                             SELECT {}
                                 ,'I' _cdc_operation_type
-                                , '1900-01-01 00:00:00' _cdc_lsn_commit_timestamp
+                                , '1900-01-01T00:00:00Z' _cdc_lsn_commit_timestamp
                                 , null _cdc_lsn_deleted_at
                                 , '00000000000000000000' _cdc_lsn_hex_value
                             FROM {}.{}
