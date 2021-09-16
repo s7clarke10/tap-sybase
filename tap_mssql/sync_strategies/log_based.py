@@ -320,7 +320,7 @@ def sync_table(mssql_conn, config, catalog_entry, state, columns, stream_version
                                        when 1 then sys.fn_cdc_map_lsn_to_time(__$start_lsn)
                                        else null
                                        end _cdc_lsn_deleted_at
-                                   , 'Testing' _cdc_lsn_hex_value
+                                   , __$start_lsn _cdc_lsn_hex_value
                                FROM cdc.fn_cdc_get_all_changes_{}(@from_lsn, @to_lsn, 'all')
                                WHERE __$start_lsn > {} and __$start_lsn <= {}
                                ORDER BY __$seqval

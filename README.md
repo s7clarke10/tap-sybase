@@ -67,7 +67,9 @@ Create a config file containing the database connection credentials, e.g.:
   "port": "3306",
   "user": "root",
   "password": "password",
-  "database": "databasename"     (This_parameter_is_optional)
+  "database": "databasename",                 (Optional._Restrict_to_a_defined_MSSQL_database.)
+  "filter_dbs": "schemaname",                 (Optional._Restrict_to_a_defined_MSSQL_database_schema.)
+  "local_db_timezone": "Pacific/Auckland"     (Optional._Sets_the_timezone_for_the_local_database_for_datetime_conversions. The_default_is_UTC._Timezones_should_follow_the_IANA_time_zone_database_formats.)
 }
 ```
 

@@ -75,10 +75,7 @@ BYTES_FOR_INTEGER_TYPE = {
 
 FLOAT_TYPES = set(["float", "double", "money"])
 
-# DATETIME_TYPES = set(["datetime", "timestamp", "date", "time", "smalldatetime"])
-DATETIME_TYPES = set(["datetime", "timestamp", "time", "smalldatetime"])
-
-DATE_TYPES = set(["date"])
+DATETIME_TYPES = set(["datetime", "timestamp", "date", "time", "smalldatetime"])
 
 VARIANT_TYPES = set(["json"])
 
@@ -119,10 +116,6 @@ def schema_for_column(c):
     elif data_type in DATETIME_TYPES:
         result.type = ["null", "string"]
         result.format = "date-time"
-
-    elif data_type in DATE_TYPES:
-        result.type = ["null", "string"]
-        result.format = "date"
 
     elif data_type in VARIANT_TYPES:
         result.type = ["null", "object"]
