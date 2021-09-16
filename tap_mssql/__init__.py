@@ -704,6 +704,7 @@ def main_impl():
     # A bit of a hack using a singer config parameter to set the Global Variable LOCAL_DB_TIME_ZONE to indicate the Local Timezone of the MSSQL Database to convert datetimes to UTC time.
     # It is too hard to retrieve this via a SQL Query that is backwards compatible, there are conditions on reading the SQL Server registry and converting the MSSQL zone names to standard timezone names.
     common.LOCAL_DB_TIME_ZONE = args.config.get("local_db_timezone") or default_timezone()
+    LOGGER.info(f"The Local Database Timezone is set to '{common.LOCAL_DB_TIME_ZONE}'")
 
     if args.discover:
         do_discover(mssql_conn, args.config)
