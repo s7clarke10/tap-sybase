@@ -122,7 +122,7 @@ def row_to_singer_record(catalog_entry, version, row, columns, time_extracted):
     row_to_persist = ()
     for idx, elem in enumerate(row):
         property_type = catalog_entry.schema.properties[columns[idx]].type
-        additional_property_format = catalog_entry.schema.properties[columns[idx]].additionalProperties
+        additional_property_format = catalog_entry.schema.properties[columns[idx]].description
         if isinstance(elem, datetime.datetime):
             # row_to_persist += (elem.isoformat() + "+00:00",)
             row_to_persist += (to_utc_datetime_str(elem),)

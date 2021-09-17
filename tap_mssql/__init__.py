@@ -118,7 +118,7 @@ def schema_for_column(c):
     elif data_type in DATE_TYPES:
         # result.type = ["null", "string"]
         # result.format = "date"
-        result.additionalProperties = "date"
+        result.description = "date"
 
     elif data_type in DATETIME_TYPES:
         result.type = ["null", "string"]
