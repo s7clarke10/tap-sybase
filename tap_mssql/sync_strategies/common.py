@@ -130,8 +130,10 @@ def row_to_singer_record(catalog_entry, version, row, columns, time_extracted):
         elif isinstance(elem, datetime.date) or property_format == "date":
             # row_to_persist += (elem.isoformat() + "T00:00:00+00:00",)
             if isinstance(elem,str):
-               elem = datetime.datetime.strptime(elem,"%Y-%m-%d")
-            row_to_persist += (to_utc_datetime_str(elem),)
+            #    elem = datetime.datetime.strptime(elem,"%Y-%m-%d")
+               row_to_persist += (elem,)
+            else:
+               row_to_persist += (to_utc_datetime_str(elem),)
 
         elif isinstance(elem, datetime.timedelta):
             # epoch = datetime.datetime.utcfromtimestamp(0)
