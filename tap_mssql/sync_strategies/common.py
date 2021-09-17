@@ -127,7 +127,7 @@ def row_to_singer_record(catalog_entry, version, row, columns, time_extracted):
             # row_to_persist += (elem.isoformat() + "+00:00",)
             row_to_persist += (to_utc_datetime_str(elem),)
 
-        elif isinstance(elem, datetime.date) or additional_property_format == "date":
+        elif isinstance(elem, datetime.date) or additional_property_format == "date_data_type":
             # row_to_persist += (elem.isoformat() + "T00:00:00+00:00",)
             if isinstance(elem,str):
                elem = datetime.datetime.strptime(elem,"%Y-%m-%d")
