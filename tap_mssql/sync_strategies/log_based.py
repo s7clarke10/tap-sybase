@@ -5,7 +5,6 @@ import copy
 import singer
 from singer import metadata
 from singer.schema import Schema
-import binascii
 
 import tap_mssql.sync_strategies.common as common
 

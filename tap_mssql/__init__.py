@@ -75,7 +75,9 @@ BYTES_FOR_INTEGER_TYPE = {
 
 FLOAT_TYPES = set(["float", "double", "money"])
 
-DATETIME_TYPES = set(["datetime", "timestamp", "date", "time", "smalldatetime"])
+DATETIME_TYPES = set(["datetime2", "datetime", "timestamp", "time", "smalldatetime"])
+
+DATE_TYPES = set(["date"])
 
 VARIANT_TYPES = set(["json"])
 
@@ -112,6 +114,10 @@ def schema_for_column(c):
     elif data_type in STRING_TYPES:
         result.type = ["null", "string"]
         result.maxLength = c.character_maximum_length
+
+    elif data_type in DATE_TYPES:
+        result.type = ["null", "string"]
+        result.format = "date"
 
     elif data_type in DATETIME_TYPES:
         result.type = ["null", "string"]
