@@ -121,13 +121,13 @@ def get_to_lsn(connection):
     return row 
 
 def add_synthetic_keys_to_schema(catalog_entry):
-   catalog_entry.schema.properties['_cdc_operation_type'] = Schema(
+   catalog_entry.schema.properties['_sdc_operation_type'] = Schema(
             description='Source operation I=Insert, D=Delete, U=Update', type=['null', 'string'], format='string')  
-   catalog_entry.schema.properties['_cdc_lsn_commit_timestamp'] = Schema(
+   catalog_entry.schema.properties['_sdc_lsn_commit_timestamp'] = Schema(
             description='Source system commit timestamp', type=['null', 'string'], format='date-time')
-   catalog_entry.schema.properties['_cdc_lsn_deleted_at'] = Schema(
+   catalog_entry.schema.properties['_sdc_lsn_deleted_at'] = Schema(
             description='Source system delete timestamp', type=['null', 'string'], format='date-time')
-   catalog_entry.schema.properties['_cdc_lsn_hex_value'] = Schema(
+   catalog_entry.schema.properties['_sdc_lsn_hex_value'] = Schema(
             description='Source system log sequence number (LSN)', type=['null', 'string'], format='string')            
 
    return catalog_entry          
@@ -186,7 +186,7 @@ def sync_historic_table(mssql_conn, config, catalog_entry, state, columns, strea
     )
 
     # Add additional keys to the columns
-    extended_columns = columns + ['_cdc_operation_type', '_cdc_lsn_commit_timestamp', '_cdc_lsn_deleted_at', '_cdc_lsn_hex_value']    
+    extended_columns = columns + ['_sdc_operation_type', '_sdc_lsn_commit_timestamp', '_sdc_lsn_deleted_at', '_sdc_lsn_hex_value']    
 
     bookmark = state.get("bookmarks", {}).get(catalog_entry.tap_stream_id, {})
     version_exists = True if "version" in bookmark else False
@@ -222,10 +222,10 @@ def sync_historic_table(mssql_conn, config, catalog_entry, state, columns, strea
 
             select_sql = """
                             SELECT {}
-                                ,'I' _cdc_operation_type
-                                , '1900-01-01T00:00:00Z' _cdc_lsn_commit_timestamp
-                                , null _cdc_lsn_deleted_at
-                                , '00000000000000000000' _cdc_lsn_hex_value
+                                ,'I' _sdc_operation_type
+                                , '1900-01-01T00:00:00Z' _sdc_lsn_commit_timestamp
+                                , null _sdc_lsn_deleted_at
+                                , '00000000000000000000' _sdc_lsn_hex_value
                             FROM {}.{}
                             ;""".format(",".join(escaped_columns), schema_name, table_name)          
             params = {}
@@ -251,7 +251,7 @@ def sync_table(mssql_conn, config, catalog_entry, state, columns, stream_version
     )
 
     # Add additional keys to the columns
-    extended_columns = columns + ['_cdc_operation_type', '_cdc_lsn_commit_timestamp', '_cdc_lsn_deleted_at', '_cdc_lsn_hex_value']
+    extended_columns = columns + ['_sdc_operation_type', '_sdc_lsn_commit_timestamp', '_sdc_lsn_deleted_at', '_sdc_lsn_hex_value']
 
     bookmark = state.get("bookmarks", {}).get(catalog_entry.tap_stream_id, {})
     version_exists = True if "version" in bookmark else False
@@ -313,13 +313,13 @@ def sync_table(mssql_conn, config, catalog_entry, state, columns, stream_version
                                        when 2 then 'I'
                                        when 4 then 'U'
                                        when 1 then 'D'
-                                   end _cdc_operation_type
-                                   , sys.fn_cdc_map_lsn_to_time(__$start_lsn) _cdc_lsn_commit_timestamp
+                                   end _sdc_operation_type
+                                   , sys.fn_cdc_map_lsn_to_time(__$start_lsn) _sdc_lsn_commit_timestamp
                                    , case __$operation
                                        when 1 then sys.fn_cdc_map_lsn_to_time(__$start_lsn)
                                        else null
-                                       end _cdc_lsn_deleted_at
-                                   , __$start_lsn _cdc_lsn_hex_value
+                                       end _sdc_lsn_deleted_at
+                                   , __$start_lsn _sdc_lsn_hex_value
                                FROM cdc.fn_cdc_get_all_changes_{}(@from_lsn, @to_lsn, 'all')
                                WHERE __$start_lsn > {} and __$start_lsn <= {}
                                ORDER BY __$seqval
