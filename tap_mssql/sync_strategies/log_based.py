@@ -116,7 +116,7 @@ def get_to_lsn(connection):
     row = cur.fetchone()
 
     LOGGER.info(
-        "Max LSN ID : %s", *row[0].hex(),
+        "Max LSN ID : %s", row[0].hex(),
     )
     return row 
 
@@ -227,7 +227,7 @@ def sync_historic_table(mssql_conn, config, catalog_entry, state, columns, strea
             select_sql = """
                             SELECT {}
                                 ,'I' _sdc_operation_type
-                                , '1900-01-01T00:00:00Z' _sdc_lsn_commit_timestamp
+                                , cast('1900-01-01' as datetime) _sdc_lsn_commit_timestamp
                                 , null _sdc_lsn_deleted_at
                                 , '00000000000000000000' _sdc_lsn_value
                                 , '00000000000000000000' _sdc_lsn_seq_value
