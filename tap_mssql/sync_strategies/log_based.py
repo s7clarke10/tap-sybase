@@ -116,7 +116,7 @@ def get_to_lsn(connection):
     row = cur.fetchone()
 
     LOGGER.info(
-        "Max LSN ID : %s", *row,
+        "Max LSN ID : %s", *row[0].hex(),
     )
     return row 
 
@@ -132,7 +132,7 @@ def add_synthetic_keys_to_schema(catalog_entry):
    catalog_entry.schema.properties['_sdc_lsn_seq_value'] = Schema(
             description='Source sequence number within the system log sequence number (LSN)', type=['null', 'string'], format='string')                          
    catalog_entry.schema.properties['_sdc_lsn_operation'] = Schema(
-            description='The operation that took place (1=Delete, 2=Insert, 3=Update (Before Image), 4=Update (After Image) )', type=['null', 'string'], format='string')  
+            description='The operation that took place (1=Delete, 2=Insert, 3=Update (Before Image), 4=Update (After Image) )', type=['null', 'integer'], format='integer')  
 
    return catalog_entry          
 
