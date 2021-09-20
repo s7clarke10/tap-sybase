@@ -126,7 +126,8 @@ def row_to_singer_record(catalog_entry, version, row, columns, time_extracted):
             row_to_persist += (to_utc_datetime_str(elem),)
 
         elif isinstance(elem, datetime.date):
-            row_to_persist += (to_utc_datetime_str(elem),)
+            # row_to_persist += (to_utc_datetime_str(elem),)
+            row_to_persist += (elem.isoformat(),)
 
         elif isinstance(elem, datetime.timedelta):
             row_to_persist += (to_utc_datetime_str(elem),)
