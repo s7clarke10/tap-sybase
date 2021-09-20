@@ -92,7 +92,7 @@ def get_lsn_available_range(connection, capture_instance_name ):
     if row[0] is None:   # Test that the lsn_from is not NULL i.e. there is change data to process
        LOGGER.info("No data available to process in CDC table %s", capture_instance_name)
     else:
-       LOGGER.info("Data available in cdc table %s from lsn %s", capture_instance_name, row[0])
+       LOGGER.info("Data available in cdc table %s from lsn %s", capture_instance_name, row[0].hex())
 
     return row
 
@@ -127,8 +127,12 @@ def add_synthetic_keys_to_schema(catalog_entry):
             description='Source system commit timestamp', type=['null', 'string'], format='date-time')
    catalog_entry.schema.properties['_sdc_lsn_deleted_at'] = Schema(
             description='Source system delete timestamp', type=['null', 'string'], format='date-time')
-   catalog_entry.schema.properties['_sdc_lsn_hex_value'] = Schema(
-            description='Source system log sequence number (LSN)', type=['null', 'string'], format='string')            
+   catalog_entry.schema.properties['_sdc_lsn_value'] = Schema(
+            description='Source system log sequence number (LSN)', type=['null', 'string'], format='string')
+   catalog_entry.schema.properties['_sdc_lsn_seq_value'] = Schema(
+            description='Source sequence number within the system log sequence number (LSN)', type=['null', 'string'], format='string')                          
+   catalog_entry.schema.properties['_sdc_lsn_operation'] = Schema(
+            description='The operation that took place (1=Delete, 2=Insert, 3=Update (Before Image), 4=Update (After Image) )', type=['null', 'string'], format='string')  
 
    return catalog_entry          
 
@@ -186,7 +190,7 @@ def sync_historic_table(mssql_conn, config, catalog_entry, state, columns, strea
     )
 
     # Add additional keys to the columns
-    extended_columns = columns + ['_sdc_operation_type', '_sdc_lsn_commit_timestamp', '_sdc_lsn_deleted_at', '_sdc_lsn_hex_value']    
+    extended_columns = columns + ['_sdc_operation_type', '_sdc_lsn_commit_timestamp', '_sdc_lsn_deleted_at', '_sdc_lsn_value', '_sdc_lsn_seq_value', '_sdc_lsn_operation']    
 
     bookmark = state.get("bookmarks", {}).get(catalog_entry.tap_stream_id, {})
     version_exists = True if "version" in bookmark else False
@@ -225,7 +229,9 @@ def sync_historic_table(mssql_conn, config, catalog_entry, state, columns, strea
                                 ,'I' _sdc_operation_type
                                 , '1900-01-01T00:00:00Z' _sdc_lsn_commit_timestamp
                                 , null _sdc_lsn_deleted_at
-                                , '00000000000000000000' _sdc_lsn_hex_value
+                                , '00000000000000000000' _sdc_lsn_value
+                                , '00000000000000000000' _sdc_lsn_seq_value
+                                , 1 as _sdc_lsn_operation
                             FROM {}.{}
                             ;""".format(",".join(escaped_columns), schema_name, table_name)          
             params = {}
@@ -251,7 +257,7 @@ def sync_table(mssql_conn, config, catalog_entry, state, columns, stream_version
     )
 
     # Add additional keys to the columns
-    extended_columns = columns + ['_sdc_operation_type', '_sdc_lsn_commit_timestamp', '_sdc_lsn_deleted_at', '_sdc_lsn_hex_value']
+    extended_columns = columns + ['_sdc_operation_type', '_sdc_lsn_commit_timestamp', '_sdc_lsn_deleted_at', '_sdc_lsn_value', '_sdc_lsn_seq_value', '_sdc_lsn_operation']
 
     bookmark = state.get("bookmarks", {}).get(catalog_entry.tap_stream_id, {})
     version_exists = True if "version" in bookmark else False
@@ -296,12 +302,9 @@ def sync_table(mssql_conn, config, catalog_entry, state, columns, stream_version
             #    lsn_to   = str(lsn_range[3].hex())
 
                if lsn_from <= state_last_lsn:
-                  LOGGER.info("The last lsn processed as per the state file %s, minimum available lsn for extract table %s", state_last_lsn, lsn_from)
+                  LOGGER.info("The last lsn processed as per the state file %s, minimum available lsn for extract table %s, and the maximum lsn is %s.", state_last_lsn, lsn_from, lsn_to)
                else:
-                  raise Exception("Error {}.{}: CDC changes have expired, the minimum lsn is %s, the last processed lsn is %s. Recommend a full load as there may be missing data.".format(schema_name, table_name, lsn_from, state_last_lsn ))                
-
-               LOGGER.info("Here is the tracking tables results from_lsn %s, to_lsn %s", lsn_range[0],lsn_range[1])
-            #    LOGGER.info("Here is the tracking tables results from_lsn_datetime %s, to_lsn_datetime %s, from_lsn %s, to_lsn %s, lsn_to_string %s", lsn_range[0],lsn_range[1],lsn_range[2],lsn_range[3],lsn_range[4])
+                  raise Exception("Error {}.{}: CDC changes have expired, the minimum lsn is {}, the last processed lsn is {}. Recommend a full load as there may be missing data.".format(schema_name, table_name, lsn_from, state_last_lsn ))                
 
                select_sql = """DECLARE @from_lsn binary (10), @to_lsn binary (10)
                     
@@ -319,7 +322,9 @@ def sync_table(mssql_conn, config, catalog_entry, state, columns, stream_version
                                        when 1 then sys.fn_cdc_map_lsn_to_time(__$start_lsn)
                                        else null
                                        end _sdc_lsn_deleted_at
-                                   , __$start_lsn _sdc_lsn_hex_value
+                                   , __$start_lsn _sdc_lsn_value
+                                   , __$seqval _sdc_lsn_seq_value 
+                                   , __$operation _sdc_lsn_operation
                                FROM cdc.fn_cdc_get_all_changes_{}(@from_lsn, @to_lsn, 'all')
                                WHERE __$start_lsn > {} and __$start_lsn <= {}
                                ORDER BY __$seqval
