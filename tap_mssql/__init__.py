@@ -75,9 +75,11 @@ BYTES_FOR_INTEGER_TYPE = {
 
 FLOAT_TYPES = set(["float", "double", "money"])
 
-DATETIME_TYPES = set(["datetime2", "datetime", "timestamp", "time", "smalldatetime"])
+DATETIME_TYPES = set(["datetime2", "datetime", "timestamp", "smalldatetime"])
 
 DATE_TYPES = set(["date"])
+
+TIME_TYPES = set(["time"])
 
 VARIANT_TYPES = set(["json"])
 
@@ -122,6 +124,10 @@ def schema_for_column(c):
     elif data_type in DATE_TYPES:
         result.type = ["null", "string"]
         result.format = "date"
+
+    elif data_type in TIME_TYPES:
+        result.type = ["null", "string"]
+        result.format = "time"
 
     elif data_type in VARIANT_TYPES:
         result.type = ["null", "object"]
@@ -699,18 +705,17 @@ def log_server_params(mssql_conn):
         except:
             LOGGER.warning("Encountered error checking server params. Error: (%s) %s", *e.args)
 
-def default_timezone():
-    return "UTC"
+def default_date_format():
+    return False
 
 def main_impl():
     args = utils.parse_args(REQUIRED_CONFIG_KEYS)
     mssql_conn = MSSQLConnection(args.config)
     log_server_params(mssql_conn)
 
-    # A bit of a hack using a singer config parameter to set the Global Variable LOCAL_DB_TIME_ZONE to indicate the Local Timezone of the MSSQL Database to convert datetimes to UTC time.
-    # It is too hard to retrieve this via a SQL Query that is backwards compatible, there are conditions on reading the SQL Server registry and converting the MSSQL zone names to standard timezone names.
-    common.LOCAL_DB_TIME_ZONE = args.config.get("local_db_timezone") or default_timezone()
-    LOGGER.info(f"The Local Database Timezone is set to '{common.LOCAL_DB_TIME_ZONE}'")
+    # Set for backwards compatibility, the Global Variable USE_DATE_DATA_TYPE_FORMAT is set to indicate the use of a date datatype rather the default of emitting dates as a string or a datetime.
+    common.USE_DATE_DATA_TYPE_FORMAT = args.config.get("use_date_datatype") or default_date_format()
+    LOGGER.info(f"Emitting dates using a date datatype =  '{common.USE_DATE_DATA_TYPE_FORMAT}'")
 
     if args.discover:
         do_discover(mssql_conn, args.config)

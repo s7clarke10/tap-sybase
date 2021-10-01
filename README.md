@@ -69,7 +69,7 @@ Create a config file containing the database connection credentials, e.g.:
   "password": "password",
   "database": "databasename",                 (Optional._Restrict_to_a_defined_MSSQL_database.)
   "filter_dbs": "schemaname",                 (Optional._Restrict_to_a_defined_MSSQL_database_schema.)
-  "local_db_timezone": "Pacific/Auckland"     (Optional._Sets_the_timezone_for_the_local_database_for_datetime_conversions. The_default_is_UTC._Timezones_should_follow_the_IANA_time_zone_database_formats.)
+  "use_date_datatype": true                   (Optional._Emits_using_a_date_datatype_rather_than_a_string.)
 }
 ```
 
@@ -299,6 +299,8 @@ more details.
 
 Please Note: CDC is different to Change Tracking which is a older approach for tracking change. Log Based only works with CDC, it does
 not work with Change Tracking!
+
+To find out more about setting up CDC, refer to this page [MSSQL CDC Setup](MS_CDC_SETUP.md)
 
 ### Incremental
 

@@ -39,6 +39,22 @@ def verify_change_data_capture_databases(connection):
     )
     return row
 
+def verify_read_isolation_databases(connection):
+    cur = connection.cursor()
+    cur.execute("""SELECT DB_NAME(database_id),
+                          is_read_committed_snapshot_on,
+                          snapshot_isolation_state_desc
+                   FROM sys.databases
+                   WHERE database_id = DB_ID();"""
+               )
+    row = cur.fetchone()
+
+    if row[1] == False and row[2] == "OFF":
+        LOGGER.warning(
+            "CDC Databases may result in dirty reads. Consider enabling Read Committed or Snapshot isolation: Database %s, Is Read Committed Snapshot is %s, Snapshot Isolation is %s", *row,
+        )
+    return row    
+
 # def get_object_id_by_table(connection, dbname, schema_name, table_name):
 #     cur = connection.cursor()
 #     query = "SELECT OBJECT_ID(N'" + dbname + "." + schema_name + "." + table_name + "') AS 'Object_ID'"
@@ -219,6 +235,8 @@ def sync_historic_table(mssql_conn, config, catalog_entry, state, columns, strea
 
             if not verify_change_data_capture_table(mssql_conn,schema_name,table_name):
                raise Exception("Error {}.{}: does not have change data capture enabled. Call EXEC sys.sp_cdc_enable_table with relevant parameters to enable CDC.".format(schema_name,table_name))            
+
+            verify_read_isolation_databases(mssql_conn)
 
             # Store the current database lsn number, will use this to store at the end of the initial load.
             # Note: Recommend no transactions loaded when the initial loads are performed.
