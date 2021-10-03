@@ -55,47 +55,6 @@ def verify_read_isolation_databases(connection):
         )
     return row    
 
-# def get_object_id_by_table(connection, dbname, schema_name, table_name):
-#     cur = connection.cursor()
-#     query = "SELECT OBJECT_ID(N'" + dbname + "." + schema_name + "." + table_name + "') AS 'Object_ID'"
-#     print(query)
-#     cur.execute(query)
-#     row = cur.fetchone()
-
-#     LOGGER.info(
-#         "Current Object ID : %s", *row,
-#     )
-#     return row
-
-# def get_lsn_extract_range(connection, schema_name, table_name, last_extract_datetime):
-#     cur = connection.cursor()
-#     query = """DECLARE @load_timestamp datetime
-#                SET @load_timestamp = '{}'
-
-#                SELECT min(sys.fn_cdc_map_lsn_to_time(__$start_lsn)) lsn_from_datetime
-#                     , max(sys.fn_cdc_map_lsn_to_time(__$start_lsn)) lsn_to_datetime
-#                     , min(__$start_lsn) lsn_from
-#                     , max(__$start_lsn) lsn_to
-#                     , max(replace(replace( convert(varchar(8),sys.fn_cdc_map_lsn_to_time(__$start_lsn),112) + convert(varchar(12),sys.fn_cdc_map_lsn_to_time(__$start_lsn),114), ':',''), ' ','')) lsn_to_string
-#                FROM cdc.{}_{}_CT
-#                WHERE __$operation != 3
-#                AND __$Start_lsn >= sys.fn_cdc_map_time_to_lsn('smallest greater than or equal', @load_timestamp )
-#                ;
-#             """.format(str(last_extract_datetime),schema_name,table_name)
-#     cur.execute(query)
-#     row = cur.fetchone()
-
-#     if row[2] is None:   # Test that the lsn_from is not NULL i.e. there is change data to process
-#        ### TO_DO:  1. Modify the query to not have a where clause
-#        ###         2. Use a SCN rather that date time as it is more accurate
-#        ###         3. Check if the SCN from the state file is between the lsn_from and lsn_to
-#        ###         4. Raise an error if last SCN is outside the range and there is change data available. This means the CDC has been purged in the source system. A full extract will be required.
-#        LOGGER.info("No data available to process in CDC table cdc.%s_%s_CT", schema_name, table_name)
-#     else:
-#        LOGGER.info("Data available in cdc table cdc.%s_%s_CT from lsn %s", schema_name, table_name, row[3])
-
-#     return row
-
 def get_lsn_available_range(connection, capture_instance_name ):
     cur = connection.cursor()
     query = """SELECT sys.fn_cdc_get_min_lsn ( '{}' ) lsn_from
@@ -111,18 +70,6 @@ def get_lsn_available_range(connection, capture_instance_name ):
        LOGGER.info("Data available in cdc table %s from lsn %s", capture_instance_name, row[0].hex())
 
     return row
-
-# def get_from_lsn(connection, capture_instance_name ):
-#     cur = connection.cursor()
-#     query = """select sys.fn_cdc_get_min_lsn ( '{}' ) """.format(capture_instance_name)
-#     print(query)
-#     cur.execute(query)
-#     row = cur.fetchone()
-
-#     LOGGER.info(
-#         "Current LSN ID : %s", *row,
-#     )
-#     return row 
 
 def get_to_lsn(connection):
     cur = connection.cursor()
@@ -151,33 +98,6 @@ def add_synthetic_keys_to_schema(catalog_entry):
             description='The operation that took place (1=Delete, 2=Insert, 3=Update (Before Image), 4=Update (After Image) )', type=['null', 'integer'], format='integer')  
 
    return catalog_entry          
-
-# def get_min_valid_version(connection, dbname, schema_name, table_name):
-#     cur = connection.cursor()
-#     query = "SELECT OBJECT_ID(N'" + dbname + "." + schema_name + "." + table_name + "') AS 'Object_ID'"
-#     print(query)
-#     cur.execute(query)
-#     row = cur.fetchone()
-
-#     LOGGER.info(
-#         "Current Object ID : %s", *row,
-#     )
-#     return row        
-
-#    with connect_with_backoff(conn_config) as open_conn:
-#        try:
-#            with open_conn.cursor() as cur:
-#                cur.execute("""select name, is_tracked_by_cdc
-#                               from sys.tables t
-#                               where is_tracked_by_cdc = 1"""
-#                           )
-#                row = cur.fetchone()
-#                LOGGER.info(
-#                    "CDC Tables : Table %s, Enabled %s", *row,
-#                )
-#                return row
-#        except:
-#            LOGGER.warning("Encountered error returning CDC tracking tables. Error: (%s) %s", *e.args)    
 
 def generate_bookmark_keys(catalog_entry):
     md_map = metadata.to_map(catalog_entry.metadata)

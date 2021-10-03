@@ -99,6 +99,9 @@ def row_to_singer_record(catalog_entry, version, row, columns, time_extracted):
         if isinstance(elem, datetime.datetime):
             row_to_persist += (elem.isoformat() + "+00:00",)
 
+        elif isinstance(elem, datetime.time):
+            row_to_persist += (elem.isoformat(),)
+
         elif isinstance(elem, datetime.date):
             if USE_DATE_DATA_TYPE_FORMAT:
                row_to_persist += (elem.isoformat(),)   # Writing Dates with a Date Datatype, not converting it to a datetime.
