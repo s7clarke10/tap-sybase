@@ -267,6 +267,8 @@ def sync_table(mssql_conn, config, catalog_entry, state, columns, stream_version
                                ORDER BY __$start_lsn, __$seqval, __$operation
                                ;""".format(py_bin_to_mssql(state_last_lsn), py_bin_to_mssql(lsn_to), ",".join(escaped_columns), schema_table )
 
+               LOGGER.info("%s",select_sql)
+
                params = {}
 
                common.sync_query(
