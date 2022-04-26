@@ -67,8 +67,8 @@ Create a config file containing the database connection credentials, e.g.:
   "port": "2638",
   "user": "root",
   "password": "password",
-  "database": "databasename",                 (Optional._Restrict_to_a_defined_MSSQL_database.)
-  "filter_dbs": "schemaname",                 (Optional._Restrict_to_a_defined_MSSQL_database_schema.)
+  "database": "databasename",                 (Optional._Restrict_to_a_defined_Sybase_database.)
+  "filter_dbs": "schemaname",                 (Optional._Restrict_to_a_defined_Sybase_database_schema.)
   "use_date_datatype": true                   (Optional._Emits_using_a_date_datatype_rather_than_a_string.)
 }
 ```
@@ -177,7 +177,7 @@ source table directly corresponds to a Singer stream.
 
 ### Field selection
 
-In sync mode, `tap-mssql` consumes the catalog and looks for tables and fields
+In sync mode, `tap-sybase` consumes the catalog and looks for tables and fields
 have been marked as _selected_ in their associated metadata entries.
 
 Redirect output from the tap's discovery mode to a file so that it can be
@@ -278,9 +278,9 @@ resultant stream of JSON data can be consumed by a Singer target.
 
 ## Replication methods and state file
 
-In the above example, we invoked `tap-mssql` without providing a _state_ file
+In the above example, we invoked `tap-sybase` without providing a _state_ file
 and without specifying a replication method. The three ways to replicate a given
-table are `FULL_TABLE`, `LOG_BASED`, and `INCREMENTAL`.
+table are `FULL_TABLE`, `LOG_BASED`, and `INCREMENTAL`. Note: `tap-sybase` has not implemented the `tap-mssql` logged based replication yet. Code and documentation left for a future update.
 
 ### Full Table
 
@@ -289,7 +289,9 @@ is invoked.
 
 ### Log Based
 
-Log_Based replication extracts change data from the MS SQL Server Change Data Capture (CDC) tables you have enrolled.
+NOTE: NOT IMPLEMENTED!
+
+Log_Based replication extracts change data from the MS SQL Server Change Data Capture (CDC) tables, are a MS SQL feature. This code and documentation has been left in with the view that Sybase may have a CDC Log based replication method.
 
 This method allows you to replicate just the changes to a table e.g. the Inserts, Deletes, and Updates. For this method to work you
 must enrol the database in question and tables that you wish to replicate.
@@ -398,7 +400,7 @@ data. For this example, let's manually write a `state.json` file using the
 Let's add some more animals to our farm:
 
 ```
-mssql> insert into animals (name, likes_getting_petted) values ('dog', true), ('elephant', true), ('frog', false);
+sybase> insert into animals (name, likes_getting_petted) values ('dog', true), ('elephant', true), ('frog', false);
 ```
 
 ```bash
@@ -431,11 +433,11 @@ Based on Stitch documentation
 
 ## Build Instructions
 
-This section dives into basic commands to build `tap-mssql` if an alteration is made to the code.
+This section dives into basic commands to build `tap-sybase` if an alteration is made to the code.
 
 ### Setup Tools
 
-You may need a copy of setup tools or an up to date version of setup tools to build `tap-mssql`
+You may need a copy of setup tools or an up to date version of setup tools to build `tap-sybase`
 
 To do this follow these instructions.
 
