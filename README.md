@@ -4,7 +4,7 @@
 
 This is a [PipelineWise](https://transferwise.github.io/pipelinewise) compatible tap connector.
 
-[![Open in Visual Studio Code](https://github.com/s7clarke10/tap-sybase/blob/main/static_images/Open_Visual_Studio_Code.svg)](https://open.vscode.dev/s7clarke10/tap-sybase)
+[![Open in Visual Studio Code](https://github.com/s7clarke10/tap-sybase/blob/master/static_images/Open_Visual_Studio_Code.svg)](https://open.vscode.dev/s7clarke10/tap-sybase)
 
 ## How to use it
 
