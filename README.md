@@ -42,11 +42,11 @@ or
 
 ### Have a source database
 
-There's some important business data siloed in this mssql database -- we need to
+There's some important business data siloed in this sybase database -- we need to
 extract it. Here's the table we'd like to sync:
 
 ```
-mssql> select * from example_db.animals;
+sybase> select * from example_db.animals;
 +----|----------|----------------------+
 | id | name     | likes_getting_petted |
 +----|----------|----------------------+
@@ -73,8 +73,8 @@ Create a config file containing the database connection credentials, e.g.:
 }
 ```
 
-These are the same basic configuration properties used by the mssql command-line
-client (`mssql`).
+These are the same basic configuration properties used by the sybase command-line
+client (`sybase`).
 
 ### Discovery mode
 
@@ -184,7 +184,7 @@ Redirect output from the tap's discovery mode to a file so that it can be
 modified:
 
 ```bash
-$ tap-mssql -c config.json --discover > properties.json
+$ tap-sybase -c config.json --discover > properties.json
 ```
 
 Then edit `properties.json` to make selections. In this example we want the
@@ -250,7 +250,7 @@ information, see [Replication methods and state file](#replication-methods-and-s
 With a properties catalog that describes field and table selections, the tap can be invoked in sync mode:
 
 ```bash
-$ tap-mssql -c config.json --properties properties.json
+$ tap-sybase -c config.json --properties properties.json
 ```
 
 Messages are written to standard output following the Singer specification. The
@@ -348,7 +348,7 @@ We have no meaningful state so far, so just invoke the tap in sync mode again
 without a state file:
 
 ```bash
-$ tap-mssql -c config.json --properties properties.json
+$ tap-sybase -c config.json --properties properties.json
 ```
 
 The output messages look very similar to when the table was replicated using the
@@ -402,7 +402,7 @@ mssql> insert into animals (name, likes_getting_petted) values ('dog', true), ('
 ```
 
 ```bash
-$ tap-mssql -c config.json --properties properties.json --state state.json
+$ tap-sybase -c config.json --properties properties.json --state state.json
 ```
 
 This invocation extracts any data since (and including) the
@@ -469,7 +469,7 @@ To run the __init__.py python program in debug mode, you need to do the followin
             "name": "Python: Program",
             "type": "python",
             "request": "launch",
-            "program": "${workspaceRoot}/tap_mssql/__init__.py",
+            "program": "${workspaceRoot}/tap_sybase/__init__.py",
             "args": [
                 "-c", "config.json",
                 "--properties", "properties.json"
@@ -481,7 +481,7 @@ To run the __init__.py python program in debug mode, you need to do the followin
 ```
 2. Add a main entry to the __init__.py file to run interactively
 
-Add the following lines to the end of the __init__.py in the tap_mssql directory.
+Add the following lines to the end of the __init__.py in the tap_sybase directory.
 
 ```python
 
