@@ -1,10 +1,10 @@
-# pipelinewise-tap-mssql
+# tap-sybase
 
-[Singer](https://www.singer.io/) tap that extracts data from a [mssql](https://www.mssql.com/) database and produces JSON-formatted data following the [Singer spec](https://github.com/singer-io/getting-started/blob/master/docs/SPEC.md).
+[Singer](https://www.singer.io/) tap that extracts data from a [sybase](https://infocenter.sybase.com/) database and produces JSON-formatted data following the [Singer spec](https://github.com/singer-io/getting-started/blob/master/docs/SPEC.md).
 
 This is a [PipelineWise](https://transferwise.github.io/pipelinewise) compatible tap connector.
 
-[![Open in Visual Studio Code](https://open.vscode.dev/badges/open-in-vscode.svg)](https://open.vscode.dev/s7clarke10/pipelinewise-tap-mssql)
+[![Open in Visual Studio Code](https://open.vscode.dev/badges/open-in-vscode.svg)](https://open.vscode.dev/s7clarke10/tap-sybase)
 
 ## How to use it
 
@@ -14,8 +14,8 @@ If you want to run this [Singer Tap](https://singer.io) independently please rea
 
 ## Usage
 
-This section dives into basic usage of `tap-mssql` by walking through extracting
-data from a table. It assumes that you can connect to and read from a mssql
+This section dives into basic usage of `tap-sybase` by walking through extracting
+data from a table. It assumes that you can connect to and read from a Sybase
 database.
 
 ### Install
@@ -28,7 +28,7 @@ It's recommended to use a virtualenv:
 
 ```bash
   python3 -m venv venv
-  pip install pipelinewise-tap-mssql
+  pip install tap-sybase
 ```
 
 or
@@ -64,7 +64,7 @@ Create a config file containing the database connection credentials, e.g.:
 ```json
 {
   "host": "localhost",
-  "port": "3306",
+  "port": "2638",
   "user": "root",
   "password": "password",
   "database": "databasename",                 (Optional._Restrict_to_a_defined_MSSQL_database.)
@@ -82,7 +82,7 @@ The tap can be invoked in discovery mode to find the available tables and
 columns in the database:
 
 ```bash
-$ tap-mssql --config config.json --discover
+$ tap-sybase --config config.json --discover
 
 ```
 
