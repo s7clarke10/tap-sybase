@@ -1,6 +1,10 @@
 # tap-sybase
 
-[Singer](https://www.singer.io/) tap that extracts data from a [sybase](https://infocenter.sybase.com/) database and produces JSON-formatted data following the [Singer spec](https://github.com/singer-io/getting-started/blob/master/docs/SPEC.md).
+[Singer](https://www.singer.io/) tap that extracts data from a [sybase](https://infocenter.sybase.com/) database and produces JSON-formatted data following the [Singer spec](https://github.com/singer-io/getting-started/blob/master/docs/SPEC.md). This TAP was built against Sybase Version 16 also known as Adapter Server Enterprise or officially as SAP Adaptive Server Enterprise (ASE) 16.0. Compatibility with older versions of Sybase is unknown, I would recommend testing the TAP for compatibility.
+
+Please Note: This TAP assumes the following Sybase Data Dictionary tables are accessible and can be selected from
+- sys.syscatalog
+- sys.syscolumns
 
 This is a [PipelineWise](https://transferwise.github.io/pipelinewise) compatible tap connector.
 
@@ -28,7 +32,6 @@ It's recommended to use a virtualenv:
 
 ```bash
   python3 -m venv venv
-  pip install tap-sybase
 ```
 
 or
@@ -37,7 +40,11 @@ or
   python3 -m venv venv
   . venv/bin/activate
   pip install --upgrade pip
-  pip install .
+```
+
+Then build the tap_sybase Python Application
+```bash
+  python setup.py install
 ```
 
 ### Have a source database

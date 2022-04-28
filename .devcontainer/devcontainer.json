@@ -2,7 +2,7 @@
 // For config options, see the README at:
 // https://github.com/microsoft/vscode-dev-containers/tree/v0.187.0/containers/python-3
 {
-	"name": "TAP MSSQL",
+	"name": "TAP SYBASE",
 	"build": {
 		"dockerfile": "Dockerfile",
 		// Optionally add build args to be passed to the dockerfile:
