@@ -61,6 +61,7 @@ STRING_TYPES = set(
         "uniqueidentifier",
         "nvarchar",
         "nchar",
+        "ntext",
     ]
 )
 
@@ -69,18 +70,22 @@ BYTES_FOR_INTEGER_TYPE = {
     "smallint": 2,
     "mediumint": 3,
     "int": 4,
-    "integer": 4,    
-    "real": 4,
+    "integer": 4,
     "bigint": 8,
     "unsigned tinyint": 1,
     "unsigned smallint": 2,
     "unsigned mediumint": 3,
-    "unsigned bigint": 8,        
+    "unsigned int": 4,
+    "unsigned bigint": 8,
+    "bigintn": 8,
+    "intn": 4,
 }
 
-FLOAT_TYPES = set(["float", "double", "money"])
+FLOAT_TYPES = set(["float", "floatn", "double", "real"])
 
-DATETIME_TYPES = set(["datetime2", "datetime", "timestamp", "smalldatetime", "timestamp with time zone"])
+DECIMAL_TYPES = set(["money", "decimal", "decimaln",  "moneyn", "numeric", "numericn", "smallmoney"])
+
+DATETIME_TYPES = set(["datetime2", "datetime", "timestamp", "smalldatetime", "timestamp with time zone", "datetimn"])
 
 DATE_TYPES = set(["date"])
 
@@ -111,16 +116,18 @@ def schema_for_column(c):
 
     elif data_type in FLOAT_TYPES:
         result.type = ["null", "number"]
-        result.multipleOf = 10 ** (0 - (c.numeric_scale or 6))
+        result.multipleOf = 10 ** (0 - (c.numeric_scale or 17))
 
-    elif data_type in ["decimal", "numeric"]:
+    elif data_type in DECIMAL_TYPES:
         result.type = ["null", "number"]
         result.multipleOf = 10 ** (0 - c.numeric_scale)
         return result
 
     elif data_type in STRING_TYPES:
         result.type = ["null", "string"]
-        result.maxLength = c.character_maximum_length
+        #When length is -1 it is a long column type https://docs.microsoft.com/en-us/sql/relational-databases/system-information-schema-views/columns-transact-sql?view=sql-server-ver15
+        #-1 is not valid JSON schema https://json-schema.org/understanding-json-schema/reference/string.html#length
+        if (c.character_maximum_length != -1): result.maxLength = c.character_maximum_length
 
     elif data_type in DATETIME_TYPES:
         result.type = ["null", "string"]
@@ -138,7 +145,11 @@ def schema_for_column(c):
         result.type = ["null", "object"]
 
     else:
-        result = Schema(None, inclusion="unsupported", description="Unsupported column type",)
+        result = Schema(
+            None,
+            inclusion="unsupported",
+            description="Unsupported column type",
+        )
     return result
 
 
@@ -169,10 +180,10 @@ def discover_catalog(mssql_conn, config):
     if filter_dbs_config:
         filter_dbs_clause = ",".join(["'{}'".format(db) for db in filter_dbs_config.split(",")])
 
-        table_schema_clause = "WHERE c.creator IN ({})".format(filter_dbs_clause)
+        table_schema_clause = "WHERE usr.name IN ({})".format(filter_dbs_clause)
     else:
         table_schema_clause = """
-        WHERE c.creator NOT IN (
+        WHERE usr.name NOT IN (
         'DBA',
         'SYS'
         )"""
@@ -181,13 +192,21 @@ def discover_catalog(mssql_conn, config):
         cur = open_conn.cursor()
         LOGGER.info("Fetching tables")
         cur.execute(
-            """SELECT creator as table_schema,
-                tname as table_name,
-                tabletype as table_type
-            FROM sys.syscatalog c
+            """SELECT
+                usr.name as table_schema
+                ,t.name as table_name
+                ,case
+                    when t.type in ('S','U') then 'TABLE'
+                    when t.type='V' then 'VIEW'
+                    else null
+                end as table_type
+                from
+                dbo.sysobjects t
+                inner join dbo.sysusers usr
+                    on t.uid=usr.uid
             {}
         """.format(
-                table_schema_clause
+                table_schema_clause + " and t.type in ('S','U','V')" 
             )
         )
         table_info = {}
@@ -200,22 +219,39 @@ def discover_catalog(mssql_conn, config):
         LOGGER.info("Tables fetched, fetching columns")
         cur.execute(
             """select
-                    c.creator   as table_schema,
-                    c.tname     as table_name,
-                    c.cname     as column_name,
-                    c.coltype   as data_type,
-                    CASE WHEN c.coltype like '%char%' THEN c.length
-                    END as character_maximum_length,
-                    CASE WHEN c.coltype in ('numeric','float') or c.coltype like '%int%' THEN c.length
-                    END as numeric_precision,
-                    CASE WHEN c.coltype in ('numeric','float') or c.coltype like '%int%' THEN c.syslength
-                    END as numeric_scale,
-                    case when in_primary_key = 'Y' then 1 else 0 end as is_primary_key
-                from sys.syscolumns c
+                usr.name as table_schema
+                ,t.name as table_name
+                ,c.name as column_name
+                ,typ.name as data_type
+                ,case
+                    when typ.name like '%char%' or typ.name like '%text%' or typ.name in ('enum','uniqueidentifer') then c.length
+                    else null
+                end as character_maximum_length
+                ,case
+                    when typ.name in ('float','real','double') or typ.name like 'decimal%' or typ.name like 'numeric%' or typ.name like '%int%' or typ.name like '%money%' then
+                    isnull(c.prec, c.length) --use precision if supplied
+                    else null
+                end as numeric_precision
+                ,c.scale as numeric_scale
+                ,case
+                    when index_col(t.name, i.indid, c.colid, t.uid) is not null then 1
+                    else 0
+                end as is_primary_key
+                from
+                dbo.sysobjects t
+                left join dbo.sysusers usr
+                    on t.uid=usr.uid
+                left join dbo.syscolumns c
+                    on c.id = t.id
+                left join dbo.systypes typ
+                    on c.usertype = typ.usertype
+                left join dbo.sysindexes i
+                    on t.id = i.id
+                    and (i.status & 2048)/2048 =1
                 {}
-                ORDER BY c.creator, c.tname, c.colno
+                ORDER BY usr.name ,t.name ,c.name
         """.format(
-                table_schema_clause
+                table_schema_clause + " and t.type in ('S','U','V')"
             )
         )
         columns = []
@@ -528,7 +564,7 @@ def do_sync_historical_log(mssql_conn, config, catalog_entry, state, columns):
     stream_version = common.get_stream_version(catalog_entry.tap_stream_id, state)
 
     # full_table.sync_table(mssql_conn, config, catalog_entry, state, columns, stream_version)
-    log_based.sync_historic_table(mssql_conn, config, catalog_entry, state, columns, stream_version)    
+    log_based.sync_historic_table(mssql_conn, config, catalog_entry, state, columns, stream_version)
 
     # Prefer initial_full_table_complete going forward
     singer.clear_bookmark(state, catalog_entry.tap_stream_id, "version")
@@ -594,7 +630,7 @@ def sync_non_cdc_streams(mssql_conn, non_cdc_catalog, config, state):
         replication_method = md_map.get((), {}).get("replication-method")
         replication_key = md_map.get((), {}).get("replication-key")
         primary_keys = md_map.get((), {}).get("table-key-properties")
-        start_lsn = md_map.get((), {}).get("lsn")        
+        start_lsn = md_map.get((), {}).get("lsn")
         LOGGER.info(f"Table {catalog_entry.table} proposes {replication_method} sync")
         if replication_method == "INCREMENTAL" and not replication_key:
             LOGGER.info(
@@ -608,7 +644,7 @@ def sync_non_cdc_streams(mssql_conn, non_cdc_catalog, config, state):
             LOGGER.info(
                 f"No initial load for {catalog_entry.table}, using full table replication"
             )
-        else:        
+        else:
             LOGGER.info(f"Table {catalog_entry.table} will use {replication_method} sync")
 
 
@@ -626,7 +662,7 @@ def sync_non_cdc_streams(mssql_conn, non_cdc_catalog, config, state):
                 do_sync_full_table(mssql_conn, config, catalog_entry, state, columns)
             elif replication_method == "LOG_BASED":
                 LOGGER.info(f"syncing {catalog_entry.table} cdc tables")
-                do_sync_historical_log(mssql_conn, config, catalog_entry, state, columns)               
+                do_sync_historical_log(mssql_conn, config, catalog_entry, state, columns)
             else:
                 raise Exception("only INCREMENTAL, LOG_BASED and FULL TABLE replication methods are supported")
 
@@ -665,12 +701,12 @@ def sync_cdc_streams(mssql_conn, cdc_catalog, config, state):
 
                 if replication_method == "LOG_BASED":
                     LOGGER.info(f"syncing {catalog_entry.table} cdc tables")
-                    do_sync_log_based(mssql_conn, config, catalog_entry, state, columns)                
+                    do_sync_log_based(mssql_conn, config, catalog_entry, state, columns)
                 else:
                     raise Exception("only LOG_BASED methods are supported for CDC")
 
         state = singer.set_currently_syncing(state, None)
-        singer.write_message(singer.StateMessage(value=copy.deepcopy(state)))                    
+        singer.write_message(singer.StateMessage(value=copy.deepcopy(state)))
 
 def do_sync(mssql_conn, config, catalog, state):
     LOGGER.info("Beginning sync")
@@ -687,7 +723,7 @@ def log_server_params(mssql_conn):
     with connect_with_backoff(mssql_conn) as open_conn:
         try:
             with open_conn.cursor() as cur:
-                cur.execute("""SELECT @@VERSION as version, 0 as lock_wait_timeout""")                
+                cur.execute("""SELECT @@VERSION as version, 0 as lock_wait_timeout""")
                 row = cur.fetchone()
                 LOGGER.info(
                     "Server Parameters: " + "version: %s, " + "lock_timeout: %s, ", *row,

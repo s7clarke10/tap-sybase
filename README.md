@@ -2,17 +2,12 @@
 
 [Singer](https://www.singer.io/) tap that extracts data from a [sybase](https://infocenter.sybase.com/) database and produces JSON-formatted data following the [Singer spec](https://github.com/singer-io/getting-started/blob/master/docs/SPEC.md). This TAP was built against Sybase Version 16 also known as Adapter Server Enterprise or officially as SAP Adaptive Server Enterprise (ASE) 16.0. Compatibility with older versions of Sybase is unknown, I would recommend testing the TAP for compatibility.
 
-Please Note: This TAP assumes the following Sybase Data Dictionary tables are accessible and can be selected from
-- sys.syscatalog
-- sys.syscolumns
 
-This is a [PipelineWise](https://transferwise.github.io/pipelinewise) compatible tap connector.
+This is a [PipelineWise](https://transferwise.github.io/pipelinewise) and [Meltano](https://meltano.com) compatible tap connector.
 
 [![Open in Visual Studio Code](https://github.com/s7clarke10/tap-sybase/blob/master/static_images/Open_Visual_Studio_Code.svg)](https://open.vscode.dev/s7clarke10/tap-sybase)
 
 ## How to use it
-
-The recommended method of running this tap is to use it from [PipelineWise](https://transferwise.github.io/pipelinewise). When running it from PipelineWise you don't need to configure this tap with JSON files and most of things are automated. Please check the related documentation at [Tap mssql](https://transferwise.github.io/pipelinewise/connectors/taps/mssql.html)
 
 If you want to run this [Singer Tap](https://singer.io) independently please read further.
 
