@@ -206,7 +206,7 @@ def discover_catalog(mssql_conn, config):
                     on t.uid=usr.uid
             {}
         """.format(
-                table_schema_clause + " and t.type in ('S','U','V')" 
+                table_schema_clause + " and t.type in ('S','U','V') and c.id is not null" 
             )
         )
         table_info = {}
