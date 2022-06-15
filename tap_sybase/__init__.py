@@ -196,7 +196,7 @@ def discover_catalog(mssql_conn, config):
                 usr.name as table_schema
                 ,t.name as table_name
                 ,case
-                    when t.type in ('S','U') then 'TABLE'
+                    when t.type in ('U') then 'TABLE'
                     when t.type='V' then 'VIEW'
                     else null
                 end as table_type
@@ -206,7 +206,7 @@ def discover_catalog(mssql_conn, config):
                     on t.uid=usr.uid
             {}
         """.format(
-                table_schema_clause + " and t.type in ('S','U','V')" 
+                table_schema_clause + " and t.type in ('U','V')" 
             )
         )
         table_info = {}
@@ -251,7 +251,7 @@ def discover_catalog(mssql_conn, config):
                 {}
                 ORDER BY usr.name ,t.name ,c.name
         """.format(
-                table_schema_clause + " and t.type in ('S','U','V') and c.id is not null"
+                table_schema_clause + " and t.type in ('U','V') and c.id is not null and t.name is not null and typ.name is not null and usr.name is not null"
             )
         )
         columns = []
