@@ -251,7 +251,7 @@ def discover_catalog(mssql_conn, config):
                 {}
                 ORDER BY usr.name ,t.name ,c.name
         """.format(
-                table_schema_clause + " and t.type in ('U','V') and c.id is not null and t.name is not null and typ.name is not null and usr.name is not null"
+                table_schema_clause + " and t.type in ('U','V') and c.id is not null and c.name is not null and t.name is not null and typ.name is not null and usr.name is not null"
             )
         )
         columns = []
