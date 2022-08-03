@@ -69,9 +69,44 @@ Create a config file containing the database connection credentials, e.g.:
   "port": "2638",
   "user": "root",
   "password": "password",
-  "database": "databasename",                 (Optional._Restrict_to_a_defined_Sybase_database.)
-  "filter_dbs": "schemaname",                 (Optional._Restrict_to_a_defined_Sybase_database_schema.)
-  "use_date_datatype": true                   (Optional._Emits_using_a_date_datatype_rather_than_a_string.)
+  "database": "databasename"
+}
+```
+
+Optional:
+
+To filter the discovery to a particular schema within a database. This is useful if you have a large number of schemas and wish to speed up the discovery.
+
+```json
+{
+  "filter_dbs": "your database schema name",
+}
+```
+
+Optional:
+
+To emit a date as a date without a time component or time without an UTC offset. This is helpful to avoid time conversions or to just work with a date datetype in the target database. If this boolean config item is not set, the default behaviour is `false` i.e. emit date datatypes as a datetime. It is recommended to set this on if you have time datetypes and are having issues uploading into into a target database.
+```json
+{
+  "use_date_datatype": true
+}
+```
+
+Optional:
+
+Set the version of TDS to use when communicating with Sybase Server (the default is None). This is used by pymssql with connecting and fetching data from Sybase databases. See the [pymssql](https://pymssql.readthedocs.io/en/stable/index.html) documentation and [FreeTDS](https://www.freetds.org/) documentation for more details.
+```json
+{
+  "tds_version": "7.3"
+}
+```
+
+Optional:
+
+The characterset for the database / source system. The default is `utf8`, however older databases might use a charactersets like [cp1252](https://en.wikipedia.org/wiki/Windows-1252) for the encoding. If you have errors with a `UnicodeDecodeError: 'utf-8' codec can't decode byte ....` then a solution is examine the characterset of the source database / system and make an appropriate substitution for utf8 like cp1252. 
+```json
+{
+  "characterset": "utf8"
 }
 ```
 
@@ -282,7 +317,7 @@ resultant stream of JSON data can be consumed by a Singer target.
 
 In the above example, we invoked `tap-sybase` without providing a _state_ file
 and without specifying a replication method. The three ways to replicate a given
-table are `FULL_TABLE`, `LOG_BASED`, and `INCREMENTAL`. Note: `tap-sybase` has not implemented the `tap-mssql` logged based replication yet. Code and documentation left for a future update.
+table are `FULL_TABLE`, and `INCREMENTAL`. Note: `tap-sybase` was cloned from `tap-mssql`, and the `LOG_BASED` based replication is not implemented yet. Code and documentation left for a future update.
 
 ### Full Table
 
@@ -291,7 +326,7 @@ is invoked.
 
 ### Log Based
 
-NOTE: NOT IMPLEMENTED!
+NOTE: NOT IMPLEMENTED! Notes below are from TAP-MSSQL.
 
 Log_Based replication extracts change data from the MS SQL Server Change Data Capture (CDC) tables, are a MS SQL feature. This code and documentation has been left in with the view that Sybase may have a CDC Log based replication method.
 
