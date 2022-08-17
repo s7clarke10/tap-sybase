@@ -234,7 +234,25 @@ def discover_catalog(mssql_conn, config):
                 end as numeric_precision
                 ,c.scale as numeric_scale
                 ,case
-                    when index_col(t.name, i.indid, c.colid, t.uid) is not null then 1
+                    when index_col(t.name, i.indid, 1 , t.uid) = c.name then 1
+                    when index_col(t.name, i.indid, 2 , t.uid) = c.name then 1
+                    when index_col(t.name, i.indid, 3 , t.uid) = c.name then 1
+                    when index_col(t.name, i.indid, 4 , t.uid) = c.name then 1
+                    when index_col(t.name, i.indid, 5 , t.uid) = c.name then 1
+                    when index_col(t.name, i.indid, 6 , t.uid) = c.name then 1
+                    when index_col(t.name, i.indid, 7 , t.uid) = c.name then 1
+                    when index_col(t.name, i.indid, 8 , t.uid) = c.name then 1
+                    when index_col(t.name, i.indid, 9 , t.uid) = c.name then 1
+                    when index_col(t.name, i.indid, 11 , t.uid) = c.name then 1
+                    when index_col(t.name, i.indid, 12 , t.uid) = c.name then 1
+                    when index_col(t.name, i.indid, 13 , t.uid) = c.name then 1
+                    when index_col(t.name, i.indid, 14 , t.uid) = c.name then 1
+                    when index_col(t.name, i.indid, 15 , t.uid) = c.name then 1
+                    when index_col(t.name, i.indid, 16 , t.uid) = c.name then 1
+                    when index_col(t.name, i.indid, 17 , t.uid) = c.name then 1
+                    when index_col(t.name, i.indid, 18 , t.uid) = c.name then 1
+                    when index_col(t.name, i.indid, 19 , t.uid) = c.name then 1
+                    when index_col(t.name, i.indid, 20 , t.uid) = c.name then 1
                     else 0
                 end as is_primary_key
                 from
