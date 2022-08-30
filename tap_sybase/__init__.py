@@ -29,6 +29,12 @@ import tap_sybase.sync_strategies.log_based as log_based
 
 from tap_sybase.connection import connect_with_backoff, MSSQLConnection
 
+def default_singer_decimal():
+    """
+    singer_decimal can be enabled in the the config, which will use singer.decimal as a format and string as the type
+    use this for large/precise numbers
+    """
+    return False
 
 Column = collections.namedtuple(
     "Column",
@@ -94,11 +100,13 @@ TIME_TYPES = set(["time"])
 VARIANT_TYPES = set(["json"])
 
 
-def schema_for_column(c):
+def schema_for_column(c, config):
     """Returns the Schema object for the given Column."""
     data_type = c.data_type.lower()
 
     inclusion = "available"
+
+    use_singer_decimal = config.get('use_singer_decimal') or default_singer_decimal()
 
     if c.is_primary_key == 1:
         inclusion = "automatic"
@@ -115,13 +123,23 @@ def schema_for_column(c):
         result.maximum = 2 ** (bits - 1) - 1
 
     elif data_type in FLOAT_TYPES:
-        result.type = ["null", "number"]
-        result.multipleOf = 10 ** (0 - (c.numeric_scale or 17))
+        if use_singer_decimal:
+            result.type = ["null","string"]
+            result.format = "singer.decimal"
+            result.additionalProperties = {"scale_precision": f"({c.numeric_precision},{c.numeric_scale})"}
+        else:
+            result.type = ["null", "number"]
+            result.multipleOf = 10 ** (0 - (c.numeric_scale or 17))
 
     elif data_type in DECIMAL_TYPES:
-        result.type = ["null", "number"]
-        result.multipleOf = 10 ** (0 - c.numeric_scale)
-        return result
+        if use_singer_decimal:
+            result.type = ["null","number"]
+            result.format = "singer.decimal"
+            result.additionalProperties = {"scale_precision": f"({c.numeric_precision},{c.numeric_scale})"}
+        else:
+            result.type = ["null", "number"]
+            result.multipleOf = 10 ** (0 - c.numeric_scale)
+
 
     elif data_type in STRING_TYPES:
         result.type = ["null", "string"]
@@ -153,11 +171,11 @@ def schema_for_column(c):
     return result
 
 
-def create_column_metadata(cols):
+def create_column_metadata(cols, config):
     mdata = {}
     mdata = metadata.write(mdata, (), "selected-by-default", False)
     for c in cols:
-        schema = schema_for_column(c)
+        schema = schema_for_column(c, config)
         mdata = metadata.write(
             mdata,
             ("properties", c.column_name),
@@ -283,7 +301,7 @@ def discover_catalog(mssql_conn, config):
             cols = list(cols)
             (table_schema, table_name) = k
             schema = Schema(
-                type="object", properties={c.column_name: schema_for_column(c) for c in cols}
+                type="object", properties={c.column_name: schema_for_column(c, config) for c in cols}
             )
             md = create_column_metadata(cols)
             md_map = metadata.to_map(md)
