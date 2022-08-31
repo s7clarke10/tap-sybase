@@ -303,7 +303,7 @@ def discover_catalog(mssql_conn, config):
             schema = Schema(
                 type="object", properties={c.column_name: schema_for_column(c, config) for c in cols}
             )
-            md = create_column_metadata(cols)
+            md = create_column_metadata(cols,config)
             md_map = metadata.to_map(md)
 
             md_map = metadata.write(md_map, (), "database-name", table_schema)
