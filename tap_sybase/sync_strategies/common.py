@@ -97,6 +97,7 @@ def row_to_singer_record(catalog_entry, version, row, columns, time_extracted):
     row_to_persist = ()
     for idx, elem in enumerate(row):
         property_type = catalog_entry.schema.properties[columns[idx]].type
+        property_format = catalog_entry.schema.properties[columns[idx]].format
         if isinstance(elem, datetime.datetime):
             row_to_persist += (elem.isoformat() + "+00:00",)
 
@@ -130,6 +131,8 @@ def row_to_singer_record(catalog_entry, version, row, columns, time_extracted):
                 boolean_representation = True
             row_to_persist += (boolean_representation,)
         elif isinstance(elem, uuid.UUID):
+            row_to_persist += (str(elem),)
+        elif property_format == 'singer.decimal':
             row_to_persist += (str(elem),)
         else:
             row_to_persist += (elem,)
