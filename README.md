@@ -114,7 +114,7 @@ The characterset for the database / source system. The default is `utf8`, howeve
 
 Optional:
 
-To emit all numeric values as strings and treat floats as string data types for the target, set use_singer_decimal to true. The resulting SCHEMA message will contain an attribute in additionalProperties containing the scale and precision of the incoming property:
+To emit all numeric values as strings and treat floats as string data types for the target, set use_singer_decimal to true. The resulting SCHEMA message will contain an attribute in additionalProperties containing the scale and precision of the discovered property:
 
 #### SCHEMA message
 ```json
