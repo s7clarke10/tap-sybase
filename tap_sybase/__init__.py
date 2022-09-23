@@ -696,11 +696,11 @@ def sync_non_cdc_streams(mssql_conn, non_cdc_catalog, config, state):
             elif replication_method == "FULL_TABLE":
                 LOGGER.info(f"syncing {catalog_entry.table} full table")
                 do_sync_full_table(mssql_conn, config, catalog_entry, state, columns)
-            elif replication_method == "LOG_BASED":
-                LOGGER.info(f"syncing {catalog_entry.table} cdc tables")
-                do_sync_historical_log(mssql_conn, config, catalog_entry, state, columns)
+            # elif replication_method == "LOG_BASED":
+            #     LOGGER.info(f"syncing {catalog_entry.table} cdc tables")
+            #     do_sync_historical_log(mssql_conn, config, catalog_entry, state, columns)
             else:
-                raise Exception("only INCREMENTAL, LOG_BASED and FULL TABLE replication methods are supported")
+                raise Exception("only INCREMENTAL, and FULL TABLE replication methods are supported. Sybase doesn't support CDC / LOG_BASED.")
 
     state = singer.set_currently_syncing(state, None)
     singer.write_message(singer.StateMessage(value=copy.deepcopy(state)))
@@ -747,12 +747,12 @@ def sync_cdc_streams(mssql_conn, cdc_catalog, config, state):
 def do_sync(mssql_conn, config, catalog, state):
     LOGGER.info("Beginning sync")
     non_cdc_catalog = get_non_cdc_streams(mssql_conn, catalog, config, state)
-    cdc_catalog = get_cdc_streams(mssql_conn, catalog, config, state)
+    # cdc_catalog = get_cdc_streams(mssql_conn, catalog, config, state)
 
     for entry in non_cdc_catalog.streams:
         LOGGER.info(f"Need to sync {entry.table}")
     sync_non_cdc_streams(mssql_conn, non_cdc_catalog, config, state)
-    sync_cdc_streams(mssql_conn, cdc_catalog, config, state)
+    # sync_cdc_streams(mssql_conn, cdc_catalog, config, state)
 
 
 def log_server_params(mssql_conn):
