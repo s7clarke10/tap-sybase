@@ -58,7 +58,7 @@ ALTER DATABASE AdventureWorks2016 ADD FILEGROUP CDC_FILEGROUP;
 
 -- Add files to the filegroup
 
-ALTER DATABASE AdventureWorks2016 ADD FILE ( NAME = cdc_files, FILENAME = 'C:\MySQLFiles\CDC_FILES' )to FILEGROUP CDC_FILEGROUP;
+ALTER DATABASE AdventureWorks2016 ADD FILE ( NAME = cdc_files, FILENAME = 'C:\MySQLFiles\CDC_FILES' ) to FILEGROUP CDC_FILEGROUP;
 
 -- ====  
 -- Enable Snapshot Isolation - Highly recommended for read consistency and to avoid dirty commits.   
