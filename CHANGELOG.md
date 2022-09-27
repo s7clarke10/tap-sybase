@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.0.2
+ * Cleaning up imports
+ * Supporting Sybase ASA / IQ data dictionary as well as ASE.
+ * Putting in default replication method
+ * Using common.get_key_properties function to get primary keys
+ * Passing config as a parameter to functions
+ * General Hygine
 ## 1.0.1
  * Raise Error if LOG_BASED replication method is used. Log based is not available under Sybase.
 
