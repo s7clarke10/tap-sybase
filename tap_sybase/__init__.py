@@ -1,15 +1,10 @@
 #!/usr/bin/env python3
 # pylint: disable=missing-docstring,not-an-iterable,too-many-locals,too-many-arguments,too-many-branches,invalid-name,duplicate-code,too-many-statements
 
-import datetime
 import collections
 import itertools
-from itertools import dropwhile
-import json
 import logging
 import copy
-from sqlite3 import DatabaseError
-import uuid
 
 import pymssql
 
@@ -17,18 +12,16 @@ import singer
 import singer.metrics as metrics
 import singer.schema
 
-from singer import bookmarks
-from singer import metadata
-from singer import utils
-from singer.schema import Schema
+from singer import metadata, utils
 from singer.catalog import Catalog, CatalogEntry
+from singer.schema import Schema
 
 import tap_sybase.sync_strategies.common as common
 import tap_sybase.sync_strategies.full_table as full_table
 import tap_sybase.sync_strategies.incremental as incremental
 import tap_sybase.sync_strategies.log_based as log_based
 
-from tap_sybase.connection import connect_with_backoff, MSSQLConnection
+from tap_sybase.connection import MSSQLConnection, connect_with_backoff
 
 def default_singer_decimal():
     """
