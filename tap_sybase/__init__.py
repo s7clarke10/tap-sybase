@@ -1,14 +1,10 @@
 #!/usr/bin/env python3
 # pylint: disable=missing-docstring,not-an-iterable,too-many-locals,too-many-arguments,too-many-branches,invalid-name,duplicate-code,too-many-statements
 
-import datetime
 import collections
 import itertools
-from itertools import dropwhile
-import json
 import logging
 import copy
-import uuid
 
 import pymssql
 
@@ -16,18 +12,16 @@ import singer
 import singer.metrics as metrics
 import singer.schema
 
-from singer import bookmarks
-from singer import metadata
-from singer import utils
-from singer.schema import Schema
+from singer import metadata, utils
 from singer.catalog import Catalog, CatalogEntry
+from singer.schema import Schema
 
 import tap_sybase.sync_strategies.common as common
 import tap_sybase.sync_strategies.full_table as full_table
 import tap_sybase.sync_strategies.incremental as incremental
 import tap_sybase.sync_strategies.log_based as log_based
 
-from tap_sybase.connection import connect_with_backoff, MSSQLConnection
+from tap_sybase.connection import MSSQLConnection, connect_with_backoff
 
 def default_singer_decimal():
     """
@@ -99,6 +93,8 @@ TIME_TYPES = set(["time"])
 
 VARIANT_TYPES = set(["json"])
 
+def default_date_format():
+    return False
 
 def schema_for_column(c, config):
     """Returns the Schema object for the given Column."""
@@ -106,6 +102,8 @@ def schema_for_column(c, config):
 
     inclusion = "available"
 
+
+    use_date_data_type_format = config.get("use_date_datatype") or default_date_format()
     use_singer_decimal = config.get('use_singer_decimal') or default_singer_decimal()
 
     if c.is_primary_key == 1:
@@ -235,61 +233,87 @@ def discover_catalog(mssql_conn, config):
 
             table_info[db][table] = {"row_count": None, "is_view": table_type == "VIEW"}
         LOGGER.info("Tables fetched, fetching columns")
-        cur.execute(
-            """select
-                usr.name as table_schema
-                ,t.name as table_name
-                ,c.name as column_name
-                ,typ.name as data_type
-                ,case
-                    when typ.name like '%char%' or typ.name like '%text%' or typ.name in ('enum','uniqueidentifer') then c.length
-                    else null
-                end as character_maximum_length
-                ,case
-                    when typ.name in ('float','real','double') or typ.name like 'decimal%' or typ.name like 'numeric%' or typ.name like '%int%' or typ.name like '%money%' then
-                    isnull(c.prec, c.length) --use precision if supplied
-                    else null
-                end as numeric_precision
-                ,c.scale as numeric_scale
-                ,case
-                    when index_col(t.name, i.indid, 1 , t.uid) = c.name then 1
-                    when index_col(t.name, i.indid, 2 , t.uid) = c.name then 1
-                    when index_col(t.name, i.indid, 3 , t.uid) = c.name then 1
-                    when index_col(t.name, i.indid, 4 , t.uid) = c.name then 1
-                    when index_col(t.name, i.indid, 5 , t.uid) = c.name then 1
-                    when index_col(t.name, i.indid, 6 , t.uid) = c.name then 1
-                    when index_col(t.name, i.indid, 7 , t.uid) = c.name then 1
-                    when index_col(t.name, i.indid, 8 , t.uid) = c.name then 1
-                    when index_col(t.name, i.indid, 9 , t.uid) = c.name then 1
-                    when index_col(t.name, i.indid, 11 , t.uid) = c.name then 1
-                    when index_col(t.name, i.indid, 12 , t.uid) = c.name then 1
-                    when index_col(t.name, i.indid, 13 , t.uid) = c.name then 1
-                    when index_col(t.name, i.indid, 14 , t.uid) = c.name then 1
-                    when index_col(t.name, i.indid, 15 , t.uid) = c.name then 1
-                    when index_col(t.name, i.indid, 16 , t.uid) = c.name then 1
-                    when index_col(t.name, i.indid, 17 , t.uid) = c.name then 1
-                    when index_col(t.name, i.indid, 18 , t.uid) = c.name then 1
-                    when index_col(t.name, i.indid, 19 , t.uid) = c.name then 1
-                    when index_col(t.name, i.indid, 20 , t.uid) = c.name then 1
-                    else 0
-                end as is_primary_key
-                from
-                dbo.sysobjects t
-                left join dbo.sysusers usr
-                    on t.uid=usr.uid
-                left join dbo.syscolumns c
-                    on c.id = t.id
-                left join dbo.systypes typ
-                    on c.usertype = typ.usertype
-                left join dbo.sysindexes i
-                    on t.id = i.id
-                    and (i.status & 2048)/2048 =1
-                {}
-                ORDER BY usr.name ,t.name ,c.name
-        """.format(
-                table_schema_clause + " and t.type in ('U','V') and c.id is not null and c.name is not null and t.name is not null and typ.name is not null and usr.name is not null"
+
+        # Try Sybase Anywhere - ASA (this should work for IQ too) queries first, followed by Sybase ASE query
+        try:
+            LOGGER.info("Trying to get Data Dictionary using a Sybase - ASA / IQ query")
+            cur.execute(
+                """select
+                        c.creator   as table_schema,
+                        c.tname     as table_name,
+                        c.cname     as column_name,
+                        c.coltype   as data_type,
+                        CASE WHEN c.coltype like '%char%' THEN c.length
+                        END as character_maximum_length,
+                        CASE WHEN c.coltype in ('numeric','float') or c.coltype like '%int%' THEN c.length
+                        END as numeric_precision,
+                        CASE WHEN c.coltype in ('numeric','float') or c.coltype like '%int%' THEN c.syslength
+                        END as numeric_scale,
+                        case when in_primary_key = 'Y' then 1 else 0 end as is_primary_key
+                    from sys.syscolumns c
+                    {}
+                    ORDER BY c.creator, c.tname, c.colno
+            """.format(
+                    table_schema_clause.replace('usr.name','c.creator')
+                )
             )
-        )
+        except pymssql.DatabaseError:
+            LOGGER.info("Trying to get Data Dictionary using a Sybase - ASE")
+            cur.execute(
+                """select
+                    usr.name as table_schema
+                    ,t.name as table_name
+                    ,c.name as column_name
+                    ,typ.name as data_type
+                    ,case
+                        when typ.name like '%char%' or typ.name like '%text%' or typ.name in ('enum','uniqueidentifer') then c.length
+                        else null
+                    end as character_maximum_length
+                    ,case
+                        when typ.name in ('float','real','double') or typ.name like 'decimal%' or typ.name like 'numeric%' or typ.name like '%int%' or typ.name like '%money%' then
+                        isnull(c.prec, c.length) --use precision if supplied
+                        else null
+                    end as numeric_precision
+                    ,c.scale as numeric_scale
+                    ,case
+                        when index_col(t.name, i.indid, 1 , t.uid) = c.name then 1
+                        when index_col(t.name, i.indid, 2 , t.uid) = c.name then 1
+                        when index_col(t.name, i.indid, 3 , t.uid) = c.name then 1
+                        when index_col(t.name, i.indid, 4 , t.uid) = c.name then 1
+                        when index_col(t.name, i.indid, 5 , t.uid) = c.name then 1
+                        when index_col(t.name, i.indid, 6 , t.uid) = c.name then 1
+                        when index_col(t.name, i.indid, 7 , t.uid) = c.name then 1
+                        when index_col(t.name, i.indid, 8 , t.uid) = c.name then 1
+                        when index_col(t.name, i.indid, 9 , t.uid) = c.name then 1
+                        when index_col(t.name, i.indid, 11 , t.uid) = c.name then 1
+                        when index_col(t.name, i.indid, 12 , t.uid) = c.name then 1
+                        when index_col(t.name, i.indid, 13 , t.uid) = c.name then 1
+                        when index_col(t.name, i.indid, 14 , t.uid) = c.name then 1
+                        when index_col(t.name, i.indid, 15 , t.uid) = c.name then 1
+                        when index_col(t.name, i.indid, 16 , t.uid) = c.name then 1
+                        when index_col(t.name, i.indid, 17 , t.uid) = c.name then 1
+                        when index_col(t.name, i.indid, 18 , t.uid) = c.name then 1
+                        when index_col(t.name, i.indid, 19 , t.uid) = c.name then 1
+                        when index_col(t.name, i.indid, 20 , t.uid) = c.name then 1
+                        else 0
+                    end as is_primary_key
+                    from
+                    dbo.sysobjects t
+                    left join dbo.sysusers usr
+                        on t.uid=usr.uid
+                    left join dbo.syscolumns c
+                        on c.id = t.id
+                    left join dbo.systypes typ
+                        on c.usertype = typ.usertype
+                    left join dbo.sysindexes i
+                        on t.id = i.id
+                        and (i.status & 2048)/2048 =1
+                    {}
+                    ORDER BY usr.name ,t.name ,c.name
+            """.format(
+                    table_schema_clause + " and t.type in ('U','V') and c.id is not null and c.name is not null and t.name is not null and typ.name is not null and usr.name is not null"
+                )
+            )
         columns = []
         rec = cur.fetchone()
         while rec is not None:
@@ -398,9 +422,6 @@ def is_valid_currently_syncing_stream(selected_stream, state):
     return False
 
 def cdc_stream_requires_historical(catalog_entry, state):
-    # log_file = singer.get_bookmark(state,
-    #                                catalog_entry.tap_stream_id,
-    #                                'log_file')
 
     current_lsn = singer.get_bookmark(state,
                                   catalog_entry.tap_stream_id,
@@ -665,9 +686,13 @@ def sync_non_cdc_streams(mssql_conn, non_cdc_catalog, config, state):
         md_map = metadata.to_map(catalog_entry.metadata)
         replication_method = md_map.get((), {}).get("replication-method")
         replication_key = md_map.get((), {}).get("replication-key")
-        primary_keys = md_map.get((), {}).get("table-key-properties")
+        primary_keys = common.get_key_properties(catalog_entry)
         start_lsn = md_map.get((), {}).get("lsn")
         LOGGER.info(f"Table {catalog_entry.table} proposes {replication_method} sync")
+        if not replication_method and config.get("default_replication_method"):
+            replication_method= config.get("default_replication_method")
+            LOGGER.info(f"Table {catalog_entry.table} reverting to DEFAULT {replication_method} sync")
+
         if replication_method == "INCREMENTAL" and not replication_key:
             LOGGER.info(
                 f"No replication key for {catalog_entry.table}, using full table replication"
@@ -767,17 +792,10 @@ def log_server_params(mssql_conn):
         except:
             LOGGER.warning("Encountered error checking server params. Error: (%s) %s", *e.args)
 
-def default_date_format():
-    return False
-
 def main_impl():
     args = utils.parse_args(REQUIRED_CONFIG_KEYS)
     mssql_conn = MSSQLConnection(args.config)
     log_server_params(mssql_conn)
-
-    # Set for backwards compatibility, the Global Variable USE_DATE_DATA_TYPE_FORMAT is set to indicate the use of a date datatype rather the default of emitting dates as a string or a datetime.
-    common.USE_DATE_DATA_TYPE_FORMAT = args.config.get("use_date_datatype") or default_date_format()
-    LOGGER.info(f"Emitting dates using a date datatype =  '{common.USE_DATE_DATA_TYPE_FORMAT}'")
 
     if args.discover:
         do_discover(mssql_conn, args.config)
