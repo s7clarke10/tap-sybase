@@ -150,8 +150,13 @@ def schema_for_column(c, config):
         result.format = "date-time"
 
     elif data_type in DATE_TYPES:
-        result.type = ["null", "string"]
-        result.format = "date"
+        if use_date_data_type_format:
+            result.type = ["null", "string"]
+            result.format = "date"
+        else:
+            result.type = ["null", "string"]
+            result.format = "date-time"
+            result.additionalProperties = {"sql_data_type": "date"}
 
     elif data_type in TIME_TYPES:
         result.type = ["null", "string"]

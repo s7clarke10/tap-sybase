@@ -146,7 +146,7 @@ def sync_historic_table(mssql_conn, config, catalog_entry, state, columns, strea
     with connect_with_backoff(mssql_conn) as open_conn:
         with open_conn.cursor() as cur:
 
-            escaped_columns = [common.escape(c) for c in columns]
+            escaped_columns = map(lambda c: common.prepare_columns_sql(catalog_entry, c, config), columns)
             table_name      = catalog_entry.table
             schema_name     = common.get_database_name(catalog_entry)
 
@@ -173,7 +173,7 @@ def sync_historic_table(mssql_conn, config, catalog_entry, state, columns, strea
             params = {}
 
             common.sync_query(
-                cur, catalog_entry, state, select_sql, extended_columns, stream_version, params, config
+                cur, catalog_entry, state, select_sql, extended_columns, stream_version, params
             )
             state = singer.write_bookmark(state, catalog_entry.tap_stream_id, 'lsn', lsn_to)
 
@@ -262,7 +262,7 @@ def sync_table(mssql_conn, config, catalog_entry, state, columns, stream_version
                 params = {}
 
                 common.sync_query(
-                    cur, catalog_entry, state, select_sql, extended_columns, stream_version, params, config
+                    cur, catalog_entry, state, select_sql, extended_columns, stream_version, params
                 )
 
             else:
