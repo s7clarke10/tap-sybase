@@ -97,7 +97,7 @@ def prepare_columns_sql(catalog_entry, c, use_date_data_type_format):
                       substring(convert(Char, {column_name}, 102),1,4)||'-'
                     ||substring(convert(Char, {column_name}, 102),6,2)||'-'
                     ||substring(convert(Char, {column_name}, 102),9,2)||'T00:00:00Z'
-                    else {column_name} end
+                    else null end
                     """
         else:
             # return "replace(convert(Char, {} , 140),' ','T')||'+00:00'".format(column_name)
@@ -107,7 +107,7 @@ def prepare_columns_sql(catalog_entry, c, use_date_data_type_format):
                     ||substring(convert(Char, {column_name}, 102),9,2)||'T'
                     ||substring(convert(Char, {column_name} , 108),1,2)
                     ||substring(convert(Char, {column_name}, 109),15,10)||'Z'
-                    else {column_name} end
+                    else null end
                     """
     elif 'string' in schema_property.type and schema_property.format == 'date':
         if use_date_data_type_format:
@@ -118,7 +118,7 @@ def prepare_columns_sql(catalog_entry, c, use_date_data_type_format):
                       substring(convert(Char, {column_name}, 102),1,4)||'-'
                     ||substring(convert(Char, {column_name}, 102),6,2)||'-'
                     ||substring(convert(Char, {column_name}, 102),9,2)||'T00:00:00Z'
-                    else {column_name} end
+                    else null end
                     """
     return column_name
 
@@ -130,6 +130,8 @@ def generate_select_sql(catalog_entry, columns, config):
     escaped_columns = map(lambda c: prepare_columns_sql(catalog_entry, c, use_date_data_type_format), columns)
 
     select_sql = "SELECT {} FROM {}.{}".format(",".join(escaped_columns), escaped_db, escaped_table)
+
+    # print(f"The SQL = {select_sql}")
 
     # escape percent signs
     select_sql = select_sql.replace("%", "%%")
