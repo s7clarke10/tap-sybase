@@ -105,8 +105,9 @@ def prepare_columns_sql(catalog_entry, c, use_date_data_type_format):
                      substring(convert(Char, {column_name}, 102),1,4)||'-'
                     ||substring(convert(Char, {column_name}, 102),6,2)||'-'
                     ||substring(convert(Char, {column_name}, 102),9,2)||'T'
-                    ||substring(convert(Char, {column_name} , 108),1,2)
-                    ||substring(convert(Char, {column_name}, 109),15,10)||'+00:00'
+                    ||substring(convert(Char, {column_name}, 108),1,2)
+                    ||substring(convert(Char, {column_name}, 109),15,6)||'.'
+                    ||substring(convert(Char, {column_name}, 109),22,3)||'+00:00'
                     else null end
                     """
     elif 'string' in schema_property.type and schema_property.format == 'date':
