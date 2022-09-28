@@ -93,24 +93,33 @@ def prepare_columns_sql(catalog_entry, c, use_date_data_type_format):
     elif 'string' in schema_property.type and schema_property.format == 'date-time':
         if sql_data_type == 'date' and not use_date_data_type_format:
             # return "replace(convert(Char, {} , 140),' ','T')||'T00:00:00+00:00'".format(column_name)
-            return f"""substring(convert(Char, {column_name}, 102),1,4)||'-'
+            return f"""case when {column_name} is not null then
+                      substring(convert(Char, {column_name}, 102),1,4)||'-'
                     ||substring(convert(Char, {column_name}, 102),6,2)||'-'
-                    ||substring(convert(Char, {column_name}, 102),9,2)||'T00:00:00Z'"""
+                    ||substring(convert(Char, {column_name}, 102),9,2)||'T00:00:00Z'
+                    else {column_name} end
+                    """
         else:
             # return "replace(convert(Char, {} , 140),' ','T')||'+00:00'".format(column_name)
-            return f"""substring(convert(Char, {column_name}, 102),1,4)||'-'
+            return f"""case when {column_name} is not null then
+                     substring(convert(Char, {column_name}, 102),1,4)||'-'
                     ||substring(convert(Char, {column_name}, 102),6,2)||'-'
                     ||substring(convert(Char, {column_name}, 102),9,2)||'T'
                     ||substring(convert(Char, {column_name} , 108),1,2)
-                    ||substring(convert(Char, {column_name}, 109),15,10)||'Z'"""
+                    ||substring(convert(Char, {column_name}, 109),15,10)||'Z'
+                    else {column_name} end
+                    """
     elif 'string' in schema_property.type and schema_property.format == 'date':
         if use_date_data_type_format:
             return "convert(char, {} , 140)".format(column_name)
         else:
             # return "convert(char, {} , 140)||'T00:00:00+00:00'".format(column_name)
-            return f"""substring(convert(Char, {column_name}, 102),1,4)||'-'
+            return f"""case when {column_name} is not null then
+                      substring(convert(Char, {column_name}, 102),1,4)||'-'
                     ||substring(convert(Char, {column_name}, 102),6,2)||'-'
-                    ||substring(convert(Char, {column_name}, 102),9,2)||'T00:00:00Z'"""
+                    ||substring(convert(Char, {column_name}, 102),9,2)||'T00:00:00Z'
+                    else {column_name} end
+                    """
     return column_name
 
 def generate_select_sql(catalog_entry, columns, config):
