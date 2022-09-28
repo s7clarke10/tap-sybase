@@ -3,7 +3,6 @@
 
 import copy
 import datetime
-from fcntl import DN_DELETE
 import singer
 import time
 import pytz
@@ -78,6 +77,32 @@ def get_key_properties(catalog_entry):
     return key_properties
 
 def prepare_columns_sql(catalog_entry, c, use_date_data_type_format):
+    """
+    Places double quotes around the columns to be selected and does any required
+    sql conversion of data to strings.
+
+    Args:
+        catalog_entry: required - The full catalog including the schema definition
+        c: required - the column being converted
+        use_date_data_type_format: required - indicates if dates should be timestamps
+    
+    Raises:
+        Exception if it contains an invalid quote i.e. `
+
+    Returns:
+        Formatted column for database select statement.
+
+    Notes:
+    Converts Dates, Datetime, Timestamp, and Time to a string because the pymssql / tds
+    support for these datatypes is limited.
+    This function also uses an estoric conversion method of converting the datetimes to
+    a string because of limited date formats on older versions of Sybase.
+    This code works with Sybase ASA and very old versions of Sybase ASE.
+
+    Note during the conversion of the datetimes there is a limit to three places in the
+    microseconds. Internally there are six places but Sybase only displays up to three
+    microseconds.
+    """
     if "`" in c:
         raise Exception(
             "Can't escape identifier {} because it contains a double quote".format(c)
