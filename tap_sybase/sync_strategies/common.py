@@ -212,16 +212,25 @@ def whitelist_bookmark_keys(bookmark_key_set, tap_stream_id, state):
     ]:
         singer.clear_bookmark(state, tap_stream_id, bk)
 
+def ResultIter(cursor, arraysize):
+    'An iterator that uses fetchmany to keep memory usage down'
+    while True:
+        results = cursor.fetchmany(arraysize)
+        if not results:
+            break
+        for result in results:
+            yield result
 
-def sync_query(cursor, catalog_entry, state, select_sql, columns, stream_version, params):
+def sync_query(cursor, catalog_entry, state, select_sql, columns, stream_version, params, config):
     replication_key = singer.get_bookmark(state, catalog_entry.tap_stream_id, "replication_key")
 
+    arraysize = int(config.get("cursor_array_size", "1"))
     select_sql = select_sql.replace('"', '')
 
     time_extracted = utils.now()
     cursor.execute(select_sql, params)
 
-    row = cursor.fetchone()
+    LOGGER.info(f"{arraysize=}")
     rows_saved = 0
 
     database_name = get_database_name(catalog_entry)
@@ -230,7 +239,7 @@ def sync_query(cursor, catalog_entry, state, select_sql, columns, stream_version
         counter.tags["database"] = database_name
         counter.tags["table"] = catalog_entry.table
 
-        while row:
+        for row in ResultIter(cursor,arraysize):
             counter.increment()
             rows_saved += 1
             record_message = row_to_singer_record(
@@ -288,6 +297,5 @@ def sync_query(cursor, catalog_entry, state, select_sql, columns, stream_version
             if rows_saved % 1000 == 0:
                 singer.write_message(singer.StateMessage(value=copy.deepcopy(state)))
 
-            row = cursor.fetchone()
 
     singer.write_message(singer.StateMessage(value=copy.deepcopy(state)))
