@@ -230,9 +230,7 @@ def sync_query(cursor, catalog_entry, state, select_sql, columns, stream_version
     time_extracted = utils.now()
     cursor.execute(select_sql, params)
 
-    # row = cursor.fetchone()
     LOGGER.info(f"{arraysize=}")
-    # rows = cursor.fetchmany(size=batch_size)
     rows_saved = 0
 
     database_name = get_database_name(catalog_entry)
@@ -241,7 +239,6 @@ def sync_query(cursor, catalog_entry, state, select_sql, columns, stream_version
         counter.tags["database"] = database_name
         counter.tags["table"] = catalog_entry.table
 
-        # while row:
         for row in ResultIter(cursor,arraysize):
             counter.increment()
             rows_saved += 1
@@ -300,6 +297,5 @@ def sync_query(cursor, catalog_entry, state, select_sql, columns, stream_version
             if rows_saved % 1000 == 0:
                 singer.write_message(singer.StateMessage(value=copy.deepcopy(state)))
 
-            # row = cursor.fetchone()
 
     singer.write_message(singer.StateMessage(value=copy.deepcopy(state)))
