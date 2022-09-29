@@ -55,7 +55,7 @@ def sync_table(mssql_conn, config, catalog_entry, state, columns, stream_version
 
     with connect_with_backoff(mssql_conn) as open_conn:
         with open_conn.cursor() as cur:
-            select_sql = common.generate_select_sql(catalog_entry, columns)
+            select_sql = common.generate_select_sql(catalog_entry, columns, config)
 
             params = {}
 

@@ -14,9 +14,6 @@ from singer import utils
 
 LOGGER = singer.get_logger()
 
-USE_DATE_DATA_TYPE_FORMAT = False
-
-
 def escape(string):
     if "`" in string:
         raise Exception(
@@ -79,12 +76,81 @@ def get_key_properties(catalog_entry):
 
     return key_properties
 
+def prepare_columns_sql(catalog_entry, c, use_date_data_type_format):
+    """
+    Places double quotes around the columns to be selected and does any required
+    sql conversion of data to strings.
 
-def generate_select_sql(catalog_entry, columns):
+    Args:
+        catalog_entry: required - The full catalog including the schema definition
+        c: required - the column being converted
+        use_date_data_type_format: required - indicates if dates should be timestamps
+    
+    Raises:
+        Exception if it contains an invalid quote i.e. `
+
+    Returns:
+        Formatted column for database select statement.
+
+    Notes:
+    Converts Dates, Datetime, Timestamp, and Time to a string because the pymssql / tds
+    support for these datatypes is limited.
+    This function also uses an estoric conversion method of converting the datetimes to
+    a string because of limited date formats on older versions of Sybase.
+    This code works with Sybase ASA and very old versions of Sybase ASE.
+
+    Note during the conversion of the datetimes there is a limit to three places in the
+    microseconds. Internally there are six places but Sybase only displays up to three
+    microseconds.
+    """
+    if "`" in c:
+        raise Exception(
+            "Can't escape identifier {} because it contains a double quote".format(c)
+        )
+    column_name = """ "{}" """.format(c)
+    schema_property = catalog_entry.schema.properties[c]
+    sql_data_type = ""
+    if schema_property.additionalProperties:
+        sql_data_type = schema_property.additionalProperties['sql_data_type']
+
+    if 'string' in schema_property.type and schema_property.format == 'time':
+        return "convert(char, {} , 140)".format(column_name)
+    elif 'string' in schema_property.type and schema_property.format == 'date-time':
+        if sql_data_type == 'date' and not use_date_data_type_format:
+            return f"""case when {column_name} is not null then
+                      substring(convert(Char, {column_name}, 102),1,4)||'-'
+                    ||substring(convert(Char, {column_name}, 102),6,2)||'-'
+                    ||substring(convert(Char, {column_name}, 102),9,2)||'T00:00:00+00:00'
+                    else null end
+                    """
+        else:
+            return f"""case when {column_name} is not null then
+                     substring(convert(Char, {column_name}, 102),1,4)||'-'
+                    ||substring(convert(Char, {column_name}, 102),6,2)||'-'
+                    ||substring(convert(Char, {column_name}, 102),9,2)||'T'
+                    ||substring(convert(Char, {column_name}, 108),1,2)
+                    ||substring(convert(Char, {column_name}, 109),15,6)||'.'
+                    ||substring(convert(Char, {column_name}, 109),22,3)||'+00:00'
+                    else null end
+                    """
+    elif 'string' in schema_property.type and schema_property.format == 'date':
+        if use_date_data_type_format:
+            return "convert(char, {} , 140)".format(column_name)
+        else:
+            return f"""case when {column_name} is not null then
+                      substring(convert(Char, {column_name}, 102),1,4)||'-'
+                    ||substring(convert(Char, {column_name}, 102),6,2)||'-'
+                    ||substring(convert(Char, {column_name}, 102),9,2)||'T00:00:00+00:00'
+                    else null end
+                    """
+    return column_name
+
+def generate_select_sql(catalog_entry, columns, config):
+    use_date_data_type_format = config.get("use_date_datatype") or default_date_format()
     database_name = get_database_name(catalog_entry)
     escaped_db = escape(database_name)
     escaped_table = escape(catalog_entry.table)
-    escaped_columns = [escape(c) for c in columns]
+    escaped_columns = map(lambda c: prepare_columns_sql(catalog_entry, c, use_date_data_type_format), columns)
 
     select_sql = "SELECT {} FROM {}.{}".format(",".join(escaped_columns), escaped_db, escaped_table)
 
@@ -93,34 +159,29 @@ def generate_select_sql(catalog_entry, columns):
 
     return select_sql
 
+def default_date_format():
+    return False
+
 def row_to_singer_record(catalog_entry, version, row, columns, time_extracted):
     row_to_persist = ()
     for idx, elem in enumerate(row):
         property_type = catalog_entry.schema.properties[columns[idx]].type
         property_format = catalog_entry.schema.properties[columns[idx]].format
-        if isinstance(elem, datetime.datetime):
-            row_to_persist += (elem.isoformat() + "+00:00",)
-
-        elif isinstance(elem, datetime.time):
-            row_to_persist += (elem.isoformat() + "+00:00",)
-
-        elif isinstance(elem, datetime.date):
-            if USE_DATE_DATA_TYPE_FORMAT:
-               row_to_persist += (elem.isoformat(),)   # Writing Dates with a Date Datatype, not converting it to a datetime.
-            else:
-               row_to_persist += (elem.isoformat() + "T00:00:00+00:00",)
-
-        elif isinstance(elem, datetime.timedelta):
+        if isinstance(elem, datetime.timedelta):
             epoch = datetime.datetime.utcfromtimestamp(0)
             timedelta_from_epoch = epoch + elem
             row_to_persist += (timedelta_from_epoch.isoformat() + "+00:00",)
 
         elif isinstance(elem, bytes):
-            # for BIT value, treat 0 as False and anything else as True
-            # boolean_representation = elem != b"\x00"
-            # row_to_persist += (boolean_representation,)
-            # Not sure why binary data was emitted as a boolean, emitting it as a hex string instead
-            row_to_persist += (str(elem.hex()),)
+            # for BIT value, treat 0 as False, 1 as True and anything else as hex
+            if elem == b"\x00":
+                boolean_representation = False
+                row_to_persist += (boolean_representation,)
+            elif elem == b"\x01":
+                boolean_representation = True
+                row_to_persist += (boolean_representation,)
+            else:
+                row_to_persist += (str(elem.hex()),)
 
         elif "boolean" in property_type or property_type == "boolean":
             if elem is None:
@@ -210,7 +271,7 @@ def sync_query(cursor, catalog_entry, state, select_sql, columns, stream_version
 
                     state = singer.write_bookmark(
                         state, catalog_entry.tap_stream_id, "last_lsn_fetched", last_lsn_fetched
-                    )                    
+                    )
 
             elif replication_method == "INCREMENTAL":
                 if replication_key is not None:

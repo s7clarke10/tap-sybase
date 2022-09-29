@@ -340,8 +340,8 @@ resultant stream of JSON data can be consumed by a Singer target.
 ## Replication methods and state file
 
 In the above example, we invoked `tap-sybase` without providing a _state_ file
-and without specifying a replication method. The three ways to replicate a given
-table are `FULL_TABLE`, and `INCREMENTAL`. Note: `tap-sybase` was cloned from `tap-mssql`, and the `LOG_BASED` based replication is not implemented yet. Code and documentation left for a future update.
+and without specifying a replication method. The two ways to replicate a given
+table are `FULL_TABLE`, and `INCREMENTAL`. Note: `tap-sybase` was cloned from `tap-mssql`, and the `LOG_BASED` based replication is not available. Code and documentation left for a potential future update.
 
 ### Full Table
 
