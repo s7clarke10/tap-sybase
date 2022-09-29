@@ -199,9 +199,9 @@ def discover_catalog(mssql_conn, config):
     filter_dbs_config = config.get("filter_dbs")
 
     if filter_dbs_config:
-        filter_dbs_clause = ",".join(["'{}'".format(db) for db in filter_dbs_config.split(",")])
+        filter_dbs_clause = ",".join([f"'{db}'" for db in filter_dbs_config.split(",")])
 
-        table_schema_clause = "WHERE usr.name IN ({})".format(filter_dbs_clause)
+        table_schema_clause = f"WHERE usr.name IN ({filter_dbs_clause})"
     else:
         table_schema_clause = """
         WHERE usr.name NOT IN (
@@ -213,7 +213,7 @@ def discover_catalog(mssql_conn, config):
         cur = open_conn.cursor()
         LOGGER.info("Fetching tables")
         cur.execute(
-            """SELECT
+            f"""SELECT
                 usr.name as table_schema
                 ,t.name as table_name
                 ,case
@@ -225,10 +225,8 @@ def discover_catalog(mssql_conn, config):
                 dbo.sysobjects t
                 inner join dbo.sysusers usr
                     on t.uid=usr.uid
-            {}
-        """.format(
-                table_schema_clause + " and t.type in ('U','V')" 
-            )
+            {table_schema_clause} and t.type in ('U','V')
+        """
         )
         table_info = {}
 
@@ -265,7 +263,7 @@ def discover_catalog(mssql_conn, config):
         except pymssql.DatabaseError:
             LOGGER.info("Trying to get Data Dictionary using a Sybase - ASE")
             cur.execute(
-                """select
+                f"""select
                     usr.name as table_schema
                     ,t.name as table_name
                     ,c.name as column_name
@@ -313,11 +311,15 @@ def discover_catalog(mssql_conn, config):
                     left join dbo.sysindexes i
                         on t.id = i.id
                         and (i.status & 2048)/2048 =1
-                    {}
-                    ORDER BY usr.name ,t.name ,c.name
-            """.format(
-                    table_schema_clause + " and t.type in ('U','V') and c.id is not null and c.name is not null and t.name is not null and typ.name is not null and usr.name is not null"
-                )
+                    {table_schema_clause}
+                    and t.type in ('U','V') 
+                    and c.id is not null 
+                    and c.name is not null 
+                    and t.name is not null 
+                    and typ.name is not null 
+                    and usr.name is not null
+                    ORDER BY usr.name ,t.name ,c.colid
+            """
             )
         columns = []
         rec = cur.fetchone()
