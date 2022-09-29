@@ -279,7 +279,7 @@ def discover_catalog(mssql_conn, config):
                     end as numeric_precision
                     ,c.scale as numeric_scale
                     ,case
-                     {[f"when index_col(t.name, i.indid, {x+1} , t.uid) = c.name then 1" for x in range(20)]}
+                     {' '.join([f"when index_col(t.name, i.indid, {x+1} , t.uid) = c.name then 1" for x in range(20)])}
                     else 0
                     end as is_primary_key
                     from
