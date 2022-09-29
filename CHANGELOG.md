@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.4
+ * Including support for fetchmany records. This will improve extract speed in low latency networks.
+ * Adjust the size via the cursor_array_size parameter, the default is 1. Changing to 10,000 will improve performance
+
 ## 1.0.3
  * Correctly output Date, Time, and Timestamp - use SQL to work-around TDS limitations
  * Working option to emit Dates as Dates without Timestamp: "use_date_datatype": true

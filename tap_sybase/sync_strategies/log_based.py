@@ -173,7 +173,7 @@ def sync_historic_table(mssql_conn, config, catalog_entry, state, columns, strea
             params = {}
 
             common.sync_query(
-                cur, catalog_entry, state, select_sql, extended_columns, stream_version, params
+                cur, catalog_entry, state, select_sql, extended_columns, stream_version, params, config
             )
             state = singer.write_bookmark(state, catalog_entry.tap_stream_id, 'lsn', lsn_to)
 
@@ -262,7 +262,7 @@ def sync_table(mssql_conn, config, catalog_entry, state, columns, stream_version
                 params = {}
 
                 common.sync_query(
-                    cur, catalog_entry, state, select_sql, extended_columns, stream_version, params
+                    cur, catalog_entry, state, select_sql, extended_columns, stream_version, params, config
                 )
 
             else:
