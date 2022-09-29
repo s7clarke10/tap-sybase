@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.3
+ * Correctly output Date, Time, and Timestamp - use SQL to work-around TDS limitations
+ * Working option to emit Dates as Dates without Timestamp: "use_date_datatype": true
+ 
 ## 1.0.2
  * Cleaning up imports
  * Supporting Sybase ASA / IQ data dictionary as well as ASE.
