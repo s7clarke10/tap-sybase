@@ -72,6 +72,10 @@ Create a config file containing the database connection credentials, e.g.:
   "database": "databasename"
 }
 ```
+These are the same basic configuration properties used by the sybase command-line
+client (`sybase`). The following options can be added optionally:
+
+#### Filter Databases (filter_dbs)
 
 Optional:
 
@@ -83,6 +87,8 @@ To filter the discovery to a particular schema within a database. This is useful
 }
 ```
 
+#### Use Date Data-type (use_date_datatype)
+
 Optional:
 
 To emit a date as a date without a time component or time without an UTC offset. This is helpful to avoid time conversions or to just work with a date datetype in the target database. If this boolean config item is not set, the default behaviour is `false` i.e. emit date datatypes as a datetime. It is recommended to set this on if you have time datetypes and are having issues uploading into into a target database.
@@ -91,6 +97,8 @@ To emit a date as a date without a time component or time without an UTC offset.
   "use_date_datatype": true
 }
 ```
+
+#### TDS Version (tds_version)
 
 Optional:
 
@@ -101,6 +109,8 @@ Set the version of TDS to use when communicating with Sybase Server (the default
 }
 ```
 
+#### Character Set (characterset)
+
 Optional:
 
 The characterset for the database / source system. The default is `utf8`, however older databases might use a charactersets like [cp1252](https://en.wikipedia.org/wiki/Windows-1252) for the encoding. If you have errors with a `UnicodeDecodeError: 'utf-8' codec can't decode byte ....` then a solution is examine the characterset of the source database / system and make an appropriate substitution for utf8 like cp1252. 
@@ -110,7 +120,37 @@ The characterset for the database / source system. The default is `utf8`, howeve
 }
 ```
 
+#### Singer Decimal (use_singer_decimal)
+
 Optional:
+
+To emit all numeric values as strings and treat floats as string data types for the target, set use_singer_decimal to true. The resulting SCHEMA message will contain an attribute in additionalProperties containing the scale and precision of the discovered property:
+
+##### SCHEMA message
+```json
+"property": {
+            "inclusion": "available",
+            "format": "singer.decimal",
+            "type": [
+              "null",
+              "number"
+            ],
+            "additionalProperties": {
+              "scale_precision": "(12,0)"
+            }
+```
+
+Usage:
+```json
+{
+  "use_singer_decimal": true
+}
+```
+
+#### Fetchmany/Array size (cursor_array_size)
+
+Optional:
+
 To make use of fetchmany(x) instead of fetchone(), use cursor_array_size with an integer value indicating the number of rows to pull. This can help in some architectures by pulling more rows into memory. The default if omitted is 1, the tap will still use fetchmany, but with an argument of 1, under the assumption that fetchmany(1) === fetchone().
 Usage:
 ```json
