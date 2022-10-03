@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.0.6
+ * Handling NULL's / None in Singer.Decimal columns.
+
 ## 1.0.5
  * Change sort order by col id
  * Resolving missing Primary Key index
