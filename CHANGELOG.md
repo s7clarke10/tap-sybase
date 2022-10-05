@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.0.7
+ * Handling currently_syncing streams with no bookmarks, this scenario was stopping the stream from syncing.
+
 ## 1.0.6
  * Handling NULL's / None in Singer.Decimal columns.
 
