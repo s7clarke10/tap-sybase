@@ -110,8 +110,10 @@ def prepare_columns_sql(catalog_entry, c, use_date_data_type_format):
     column_name = """ "{}" """.format(c)
     schema_property = catalog_entry.schema.properties[c]
     sql_data_type = ""
+    # additionalProperties is used with singer.decimal to contain scale/precision
+    # in those cases, there will not be an sql_data_type value in the schema
     if schema_property.additionalProperties:
-        sql_data_type = schema_property.additionalProperties['sql_data_type']
+        sql_data_type = schema_property.additionalProperties.get('sql_data_type',"")
 
     if 'string' in schema_property.type and schema_property.format == 'time':
         return "convert(char, {} , 140)".format(column_name)
