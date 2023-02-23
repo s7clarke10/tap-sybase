@@ -1,4 +1,5 @@
 # tap-sybase
+![singer_sybase_tap](https://user-images.githubusercontent.com/84364906/220868966-0e4c1e55-6031-4e8d-b7f6-af56f9927864.png)
 
 [Singer](https://www.singer.io/) tap that extracts data from a [sybase](https://infocenter.sybase.com/) database and produces JSON-formatted data following the [Singer spec](https://github.com/singer-io/getting-started/blob/master/docs/SPEC.md). This TAP was built against Sybase Version 16 also known as Adapter Server Enterprise or officially as SAP Adaptive Server Enterprise (ASE) 16.0. Compatibility with older versions of Sybase is unknown, I would recommend testing the TAP for compatibility.
 
