@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.0.9
+ * Bumps singer-python from 5.9.0 to 5.13.0.
+
 ## 1.0.8
  * Bump attrs from 16.3.0 to 22.2.0
 
