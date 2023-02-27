@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.0.8
+ * Bump attrs from 16.3.0 to 22.2.0
+
 ## 1.0.7
  * Handling currently_syncing streams with no bookmarks, this scenario was stopping the stream from syncing.
 

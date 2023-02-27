@@ -14,7 +14,7 @@ setup(
     ],
     py_modules=["tap_sybase"],
     install_requires=[
-        "attrs==16.3.0",
+        "attrs==22.2.0",
         "pendulum>=1.2.0",
         "singer-python==5.9.0",
         "pymssql>=2.2.1",
