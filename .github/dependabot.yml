@@ -10,3 +10,6 @@ updates:
     # Check the npm registry for updates every day (weekdays)
     schedule:
       interval: "daily"
+    ignore:
+      - dependency-name: "backoff"
+        # Ignore the backoff dependency as singer-python has a hard dependency of backoff 1.8.0
