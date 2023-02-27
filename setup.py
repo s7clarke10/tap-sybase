@@ -16,7 +16,7 @@ setup(
     install_requires=[
         "attrs==22.2.0",
         "pendulum>=1.2.0",
-        "singer-python==5.9.0",
+        "singer-python==5.13.0",
         "pymssql>=2.2.1",
         "backoff==1.8.0",
     ],
