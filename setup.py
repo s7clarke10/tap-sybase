@@ -18,7 +18,7 @@ setup(
         "pendulum>=1.2.0",
         "singer-python==5.13.0",
         "pymssql>=2.2.1",
-        "backoff==1.8.0",
+        "backoff==2.2.1",
     ],
     entry_points="""
           [console_scripts]
