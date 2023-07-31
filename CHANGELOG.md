@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.0.10
+ * Resolving issue with pymssql - excluding version 2.2.8
+
 ## 1.0.9
  * Bumps singer-python from 5.9.0 to 5.13.0.
 
