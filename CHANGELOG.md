@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.0.11
+ * Restricting the upper limit on pymssql to version 2.2.7 for now. There was a breaking change in 2.2.9
+   where the SQL syntax is not compatible with Sybase. Need to investigate and raise a PR with pymssql,
+   for now restrict higher versions of pymssql.
+
 ## 1.0.10
  * Resolving issue with pymssql - excluding version 2.2.8
 
