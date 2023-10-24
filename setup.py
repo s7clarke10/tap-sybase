@@ -18,7 +18,7 @@ setup(
         "pendulum>=1.2.0",
         "singer-python==5.13.0",
 #        pymssql==2.2.8 broken: https://github.com/pymssql/pymssql/issues/833
-        "pymssql>=2.1.1,!=2.2.8",
+        "pymssql>=2.1.1,<=2.2.7",
         "backoff==1.8.0",
     ],
     entry_points="""
