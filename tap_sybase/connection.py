@@ -3,6 +3,7 @@
 import backoff
 
 import pymssql
+from   pymssql._mssql import MSSQLDatabaseException
 
 import singer
 import ssl
@@ -39,8 +40,16 @@ class MSSQLConnection(pymssql.Connection):
             "tds_version": config.get("tds_version", None),
             "conn_properties": '',
         }
-        conn = pymssql._mssql.connect(**args)
-        super().__init__(conn, False, True)
+
+        try:
+            conn = pymssql._mssql.connect(**args)
+            super().__init__(conn, False, True)
+        except:
+            # Set TDS version to lower version supporting older versions of Sybase
+            # Older versions of Sybase to not support certain keywords like AS
+            args["tds_version"] = 4.2
+            conn = pymssql._mssql.connect(**args)
+            super().__init__(conn, False, True)
 
     def __enter__(self):
         return self
