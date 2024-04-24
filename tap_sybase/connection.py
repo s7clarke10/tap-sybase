@@ -47,7 +47,7 @@ class MSSQLConnection(pymssql.Connection):
         except:
             # Set TDS version to lower version supporting older versions of Sybase
             # Older versions of Sybase to not support certain keywords like AS
-            args["tds_version"] = 4.2
+            args["tds_version"] = "4.2"
             conn = pymssql._mssql.connect(**args)
             super().__init__(conn, False, True)
 
