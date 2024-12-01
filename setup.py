@@ -4,7 +4,7 @@ from setuptools import setup
 
 setup(
     name="tap-sybase",
-    version="1.0.11",
+    version="1.0.13",
     description="Singer.io tap for extracting data from SQL Server - PipelineWise compatible",
     author="Stitch",
     url="https://github.com/s7clarke10/tap-sybase",
@@ -14,12 +14,11 @@ setup(
     ],
     py_modules=["tap_sybase"],
     install_requires=[
-        "attrs==23.1.0",
+        "attrs>=24.2.0",
         "pendulum>=1.2.0",
-        "singer-python==5.13.0",
-#        pymssql==2.2.8 broken: https://github.com/pymssql/pymssql/issues/833
+        "realit-singer-python>=5.0.0",
         "pymssql>=2.2.9",
-        "backoff==1.8.0",
+        "backoff>=1.8.0",
     ],
     entry_points="""
           [console_scripts]

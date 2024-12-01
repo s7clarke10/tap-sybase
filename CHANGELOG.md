@@ -1,4 +1,14 @@
 # Changelog
+## 1.0.13
+* Using correct format sybase time datatype
+  - https://github.com/s7clarke10/tap-sybase/pull/28
+## 1.0.12
+* Patching tap-sybase with the latest dependencies
+  - attrs -> ">=24.2.0"
+  - backoff -> ">=1.8.0"
+  - pendulum -> ">=1.2.0"
+  - pymssql -> ">=2.1.4,!=2.2.8"
+  - singer-python -> Replaced with a patched version realit-singer-python = ">=5.0.0"
 
 ## 1.0.11
  * Restricting the upper limit on pymssql to version 2.2.7 for now. There was a breaking change in 2.2.9
