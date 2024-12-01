@@ -1,4 +1,6 @@
 # Changelog
+## 1.1.0
+* Downgrading FreeTDS version if connection fails for older versions of Sybase.
 ## 1.0.13
 * Using correct format sybase time datatype
   - https://github.com/s7clarke10/tap-sybase/pull/28
