@@ -116,7 +116,7 @@ def prepare_columns_sql(catalog_entry, c, use_date_data_type_format):
         sql_data_type = schema_property.additionalProperties.get('sql_data_type',"")
 
     if 'string' in schema_property.type and schema_property.format == 'time':
-        return "convert(char, {} , 140)".format(column_name)
+        return "ltrim(rtrim(convert(char, {}, 108)))".format(column_name)
     elif 'string' in schema_property.type and schema_property.format == 'date-time':
         if sql_data_type == 'date' and not use_date_data_type_format:
             return f"""case when {column_name} is not null then
