@@ -4,7 +4,7 @@ from setuptools import setup
 
 setup(
     name="tap-sybase",
-    version="1.0.12",
+    version="1.0.13",
     description="Singer.io tap for extracting data from SQL Server - PipelineWise compatible",
     author="Stitch",
     url="https://github.com/s7clarke10/tap-sybase",

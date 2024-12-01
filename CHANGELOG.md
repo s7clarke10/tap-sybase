@@ -1,4 +1,7 @@
 # Changelog
+## 1.0.13
+* Using correct format sybase time datatype
+  - https://github.com/s7clarke10/tap-sybase/pull/28
 ## 1.0.12
 * Patching tap-sybase with the latest dependencies
   - attrs -> ">=24.2.0"
